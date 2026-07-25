@@ -13,34 +13,229 @@ Your environment includes two MCP servers:
 ** *Metrics* — query Prometheus for CPU, memory, and custom metrics via PromQL
 ** *Config* — manage kubeconfig contexts for multi-cluster operations
 ** *NetEdge* — diagnose OVN networking issues on nodes
-* *ACS MCP Server* — provides tools for interacting with Red Hat Advanced Cluster Security APIs (policies, violations, images, deployments, risk scores, etc.)
-
-These servers implement the MCP specification, allowing any MCP-compatible client (Claude Desktop, Cursor, VS Code, MCP Inspector, or custom agents) to connect and use cluster and security tools. RBAC is enforced — the MCP server respects the user's OpenShift permissions, so a read-only user cannot delete resources even through the AI.
+The server implements the MCP specification, allowing any MCP-compatible client (Claude Desktop, Cursor, VS Code, MCP Inspector, or custom agents) to connect and use cluster tools. RBAC is enforced — the MCP server respects the user's OpenShift permissions, so a read-only user cannot delete resources even through the AI.
 
 == Before You Begin
 
-* Verify the OpenShift MCP server is running: `oc get pods -n openshift-mcp`
-* Verify the ACS MCP server is running: `oc get pods -n acs-mcp`
-* Check the MCP server services: `oc get svc -n openshift-mcp` and `oc get svc -n acs-mcp`
+* Verify the OpenShift MCP server is running:
++
+[source,bash,role="copypaste"]
+----
+oc get pods -n openshift-mcp
+----
+
+* Note the MCP server endpoint for use in your AI client:
++
+----
+https://mcp-server.{openshift_cluster_ingress_domain}/mcp
+----
 
 == Hands-on Exercises
 
-_Content coming soon._
+=== Exercise 1: Connect Your AI Client to the MCP Server
+
+To connect an MCP-compatible client (Claude Desktop, Cursor, etc.) to the OpenShift MCP server, you need an OpenShift bearer token.
+
+Generate a token for the `mcp-admin` user (has full cluster access):
+
+[source,bash,role="copypaste"]
+----
+oc login -u mcp-admin -p mcpadminpass
+echo "Your mcp-admin token: $(oc whoami -t)"
+oc login -u {openshift_cluster_admin_username} -p {openshift_cluster_admin_password}
+----
+
+NOTE: The commands above log in as `mcp-admin` to obtain the token, then immediately switch back to the cluster admin. Copy the displayed token for use in your AI client.
+
+Configure your MCP client with the endpoint and token.
+
+For *Claude Code* (CLI), run:
+
+[source,bash]
+----
+claude mcp add --transport http openshift \
+  https://mcp-server.{openshift_cluster_ingress_domain}/mcp \
+  --header "Authorization: Bearer <paste-your-token-here>"
+----
+
+For *Claude Desktop* or *Cursor*, add the following to your MCP server settings:
+
+[source,json]
+----
+{
+  "mcpServers": {
+    "openshift": {
+      "url": "https://mcp-server.{openshift_cluster_ingress_domain}/mcp",
+      "headers": {
+        "Authorization": "Bearer <paste-your-token-here>"
+      }
+    }
+  }
+}
+----
+
+Once connected, ask your AI assistant: _"List all pods in namespace openshift-lightspeed"_ and verify it returns results without you running any `oc` commands.
+
+
+=== Exercise 2: AI-Assisted Log Retrieval
+
+Retrieving pod logs is one of the most common troubleshooting tasks. The MCP server lets AI assistants fetch logs directly, identify failing pods, and correlate errors — all through conversation.
+
+Using your connected AI client, try these prompts:
+
+* _"Show me the logs for pods in the payments namespace"_
+* _"Are there any pods in CrashLoopBackOff across the cluster?"_
+* _"Show me the last 50 lines of logs for the reporting-service in the payments namespace"_
+
+The AI should use the MCP `pods_log` and `pods_list` tools to retrieve the information without you running `oc logs` manually.
+
+=== Exercise 3: Create a Resource via AI
+
+The MCP server supports resource creation through natural language. This demonstrates how AI can translate intent into valid Kubernetes YAML and apply it.
+
+Ask your AI assistant:
+
+* _"Create a ConfigMap named test-config in namespace default with key app.properties and value environment=staging"_
+
+Then verify it was created:
+
+[source,bash,role="copypaste"]
+----
+oc get cm test-config -n default -o yaml
+----
+
+Clean up when done:
+
+[source,bash,role="copypaste"]
+----
+oc delete cm test-config -n default
+----
+
+=== Exercise 4: RBAC Enforcement — Read-Only User
+
+In production environments, not every user should have write access. The MCP server enforces OpenShift RBAC per-user via bearer token passthrough — a read-only user cannot create, modify, or delete resources even when asking the AI to do so.
+
+Generate a token for the `mcp-viewer` user (has read-only access):
+
+[source,bash,role="copypaste"]
+----
+oc login -u mcp-viewer -p mcpviewerpass
+echo "Your mcp-viewer token: $(oc whoami -t)"
+oc login -u {openshift_cluster_admin_username} -p {openshift_cluster_admin_password}
+----
+
+Update your AI client configuration to use the `mcp-viewer` token, then try:
+
+* _"List all pods in the default namespace"_ — this should succeed
+* _"Delete the pod test-pod in namespace default"_ — this should fail with a permissions error
+* _"Create a ConfigMap named hack in namespace default"_ — this should also fail
+
+The AI should report a clear error message indicating insufficient permissions. Verify the error includes the specific RBAC permission needed (e.g., "pods/delete").
+
+
+=== Exercise 5: Query Prometheus Metrics
+
+Observability is critical for maintaining healthy clusters. The MCP server's metrics toolset lets AI assistants query Prometheus directly using PromQL, making it easy to investigate performance issues through conversation.
+
+Using your AI client (connected with the `mcp-admin` token), try:
+
+* _"What is the current CPU usage across all nodes?"_
+* _"Show me memory usage for pods in the payments namespace over the last hour"_
+* _"Are there any firing alerts in the cluster?"_
+* _"What is the error rate for HTTP requests in the payments namespace?"_
+
+The AI will use the `list_metrics`, `execute_instant_query`, `execute_range_query`, and `get_alerts` tools to query the cluster's Thanos/Prometheus endpoint.
+
+=== Exercise 6: Network Diagnostics with NetEdge
+
+Network issues can be difficult to diagnose. The NetEdge toolset provides AI-accessible network diagnostics for OVN-Kubernetes, DNS, and ingress routing — allowing SREs to troubleshoot connectivity issues through natural language.
+
+Using your AI client, try:
+
+* _"Run ingress diagnostics on this cluster"_
+* _"Check DNS resolution for kubernetes.default.svc from the MCP server"_
+* _"Show me the HAProxy router configuration"_
+* _"What are the endpoints for the openshift-mcp-server service in the openshift-mcp namespace?"_
+
+=== Exercise 7: AI Safety — Destructive Operation Warnings
+
+In environments with write access, it's important that AI assistants warn users before executing potentially destructive operations. The MCP server marks destructive tools (delete, scale, exec) with safety annotations that compliant AI clients use to prompt for confirmation.
+
+First, create a test namespace:
+
+[source,bash,role="copypaste"]
+----
+oc create namespace safety-test
+oc run test-pod --image=registry.access.redhat.com/ubi9/ubi-minimal:latest --command -- sleep 3600 -n safety-test
+----
+
+Using your AI client (connected with the `mcp-admin` token), try:
+
+* _"Delete the namespace safety-test"_
+
+The AI should *not* immediately delete the namespace. Instead, it should warn you about the consequences (all resources in the namespace will be permanently removed) and ask for explicit confirmation before proceeding. Type "cancel" or "no" to abort.
+
+Try other phrasings to test the safety boundary:
+
+* _"Remove all pods in the safety-test namespace"_
+* _"Scale the reporting-service deployment to 0 replicas in the payments namespace"_
+
+Each should trigger a confirmation prompt before execution.
+
+Clean up when done:
+
+[source,bash,role="copypaste"]
+----
+oc delete namespace safety-test
+----
+
+=== Exercise 8: Read-Only Mode
+
+For compliance and security-sensitive environments, the MCP server can be placed in read-only mode at the server level. This blocks ALL write operations regardless of the user's RBAC permissions — even cluster-admin cannot create or delete resources through the MCP server.
+
+Enable read-only mode:
+
+[source,bash,role="copypaste"]
+----
+oc get configmap mcp-config -n openshift-mcp -o json \
+  | jq '.data["config.toml"] |= gsub("read_only = false"; "read_only = true")' \
+  | oc apply -f -
+oc rollout restart deployment openshift-mcp-server -n openshift-mcp
+oc rollout status deployment openshift-mcp-server -n openshift-mcp
+----
+
+Now, using your AI client (connected with the `mcp-admin` token), try:
+
+* _"Create a ConfigMap named read-only-test in namespace default"_ — should fail with "read-only mode"
+* _"Delete a pod in namespace openshift-mcp"_ — should fail with "read-only mode"
+* _"List all pods in the default namespace"_ — should succeed (read operations still work)
+
+When done, revert the change:
+
+[source,bash,role="copypaste"]
+----
+oc get configmap mcp-config -n openshift-mcp -o json \
+  | jq '.data["config.toml"] |= gsub("read_only = true"; "read_only = false")' \
+  | oc apply -f -
+oc rollout restart deployment openshift-mcp-server -n openshift-mcp
+----
 
 == Other Things to Try
 
-* Connect to the OpenShift MCP server from an MCP-compatible client (e.g., Claude Desktop, Cursor, MCP Inspector)
-* Use the ACS MCP server to query vulnerability data for images running in the cluster
-* List available tools on each server using the `tools/list` MCP method
+* Use the `discover_tools` prompt to see all available tools and their descriptions
 * Combine MCP server tools with the agentic operator for AI-driven cluster operations
 
 == Known Limitations
 
-* The ACS MCP server image is pinned to a specific tag for `ca_cert_path` support
-* The OpenShift MCP server runs with cluster-admin privileges
+* Bearer tokens expire (typically 24 hours) — generate a new token if you receive 401 errors
+* The metrics toolset requires the user's token to have `cluster-monitoring-view` access for Prometheus queries
+* AI safety prompting depends on the AI client respecting the `destructiveHint` tool annotation — behavior may vary across clients
 
 == Key Takeaways
 
 * MCP servers bridge the gap between AI agents and platform APIs using a standardized protocol
-* Each server exposes a curated set of tools with typed parameters and structured responses
+* Bearer token passthrough ensures per-user RBAC enforcement — each user's permissions are respected
+* The metrics toolset provides AI-accessible Prometheus querying for observability workflows
+* Read-only mode provides a server-level safety mechanism independent of RBAC
+* Destructive operations are annotated with safety hints that compliant AI clients use for confirmation prompts
 * MCP servers can be used standalone or federated through an MCP Gateway
