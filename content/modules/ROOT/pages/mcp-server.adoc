@@ -24,7 +24,7 @@ The server implements the MCP specification, allowing any MCP-compatible client 
 oc get pods -n openshift-mcp
 ----
 
-* Note the MCP server endpoint for use in your AI client:
+* Note the MCP server endpoint for use in your AI client (you will also need a bearer token, generated in Exercise 1):
 +
 [source,text,role="copypaste",subs="+attributes"]
 ----
@@ -137,11 +137,11 @@ oc login -u {openshift_cluster_admin_username} -p {openshift_cluster_admin_passw
 
 Update your AI client configuration to use the `mcp-viewer` token, then try:
 
-* _"List all pods in the default namespace"_ — this should succeed
-* _"Delete the pod test-pod in namespace default"_ — this should fail with a permissions error
+* _"List all pods in the mcp-demo-logs namespace"_ — this should succeed (read operations work)
+* _"Delete the pod healthy-pod in namespace mcp-demo-logs"_ — this should fail with a permissions error
 * _"Create a ConfigMap named hack in namespace default"_ — this should also fail
 
-The AI should report a clear error message indicating insufficient permissions. Verify the error includes the specific RBAC permission needed (e.g., "pods/delete").
+The AI should report a clear 403 Forbidden error indicating insufficient permissions (e.g., `cannot delete resource "pods"`). The `healthy-pod` should remain Running.
 
 When done, switch your AI client back to the `mcp-admin` token (from Exercise 1) for the remaining exercises.
 
