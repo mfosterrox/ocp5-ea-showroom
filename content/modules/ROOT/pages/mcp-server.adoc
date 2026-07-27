@@ -145,7 +145,7 @@ Update your AI client configuration to use the `mcp-viewer` token, then try:
 
 The AI should report a clear 403 Forbidden error indicating insufficient permissions (e.g., `cannot delete resource "pods"`). The `healthy-pod` should remain Running.
 
-When done, switch your AI client back to the `mcp-admin` token (from Exercise 1) for the remaining exercises.
+IMPORTANT: Switch your AI client back to the `mcp-admin` token (from Exercise 1) before continuing. The remaining exercises require write access and will fail with the `mcp-viewer` token.
 
 === Exercise 5: Query Prometheus Metrics
 
@@ -171,7 +171,7 @@ Cross-check results in the OpenShift Console: *Observe > Metrics*, then paste:
 rate(container_cpu_usage_seconds_total{namespace="mcp-demo-production"}[5m])
 ----
 
-image::mcp-server-metrics-console.png[Prometheus metrics query in OpenShift Console showing CPU usage for mcp-demo-production pods]
+image::mcp-server-metrics-console.png[Prometheus metrics query in OpenShift Console showing CPU usage for mcp-demo-production pods,link=_images/mcp-server-metrics-console.png,window=_blank]
 
 You can also try: _"Are there any firing alerts in the cluster?"_
 
