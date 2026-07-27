@@ -26,7 +26,7 @@ oc get pods -n openshift-mcp
 
 * Note the MCP server endpoint for use in your AI client:
 +
-[source,text,role="copypaste"]
+[source,text,role="copypaste",subs="+attributes"]
 ----
 https://mcp-server.{openshift_cluster_ingress_domain}/mcp
 ----
@@ -39,7 +39,7 @@ To connect an MCP-compatible client (Claude Desktop, Cursor, etc.) to the OpenSh
 
 Generate a token for the `mcp-admin` user (has full cluster access):
 
-[source,bash,role="copypaste"]
+[source,bash,role="copypaste",subs="+attributes"]
 ----
 oc login -u mcp-admin -p mcpadminpass
 echo "Your mcp-admin token: $(oc whoami -t)"
@@ -52,7 +52,7 @@ Configure your MCP client with the endpoint and token.
 
 For *Claude Code* (CLI), run:
 
-[source,bash,role="copypaste"]
+[source,bash,role="copypaste",subs="+attributes"]
 ----
 claude mcp add --transport http openshift \
   https://mcp-server.{openshift_cluster_ingress_domain}/mcp \
@@ -61,7 +61,7 @@ claude mcp add --transport http openshift \
 
 For *Claude Desktop* or *Cursor*, add the following to your MCP server settings:
 
-[source,json,role="copypaste"]
+[source,json,role="copypaste",subs="+attributes"]
 ----
 {
   "mcpServers": {
@@ -128,7 +128,7 @@ In production environments, not every user should have write access. The MCP ser
 
 Generate a token for the `mcp-viewer` user (has read-only access):
 
-[source,bash,role="copypaste"]
+[source,bash,role="copypaste",subs="+attributes"]
 ----
 oc login -u mcp-viewer -p mcpviewerpass
 echo "Your mcp-viewer token: $(oc whoami -t)"
