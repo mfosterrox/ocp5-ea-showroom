@@ -37,30 +37,32 @@ https://mcp-server.{openshift_cluster_ingress_domain}/mcp
 
 To connect an MCP-compatible client (Claude Desktop, Cursor, etc.) to the OpenShift MCP server, you need an OpenShift bearer token.
 
-Generate a token for the `mcp-admin` user (has full cluster access):
-
+. Generate a token for the `mcp-admin` user (has full cluster access):
++
 [source,bash,role="copypaste",subs="+attributes"]
 ----
 oc login -u mcp-admin -p mcpadminpass
+echo "============================================================"
 echo "Your mcp-admin token: $(oc whoami -t)"
+echo "============================================================"
 oc login -u {openshift_cluster_admin_username} -p {openshift_cluster_admin_password}
 ----
-
++
 NOTE: The commands above log in as `mcp-admin` to obtain the token, then immediately switch back to the cluster admin. Copy the displayed token for use in your AI client.
 
-Configure your MCP client with the endpoint and token.
-
+. Configure your MCP client with the endpoint and token, replacing `<paste-your-token-here>` with the token you just generated.
++
 For *Claude Code* (CLI), run:
-
++
 [source,bash,role="copypaste",subs="+attributes"]
 ----
 claude mcp add --transport http openshift \
   https://mcp-server.{openshift_cluster_ingress_domain}/mcp \
   --header "Authorization: Bearer <paste-your-token-here>"
 ----
-
++
 For *Claude Desktop* or *Cursor*, add the following to your MCP server settings:
-
++
 [source,json,role="copypaste",subs="+attributes"]
 ----
 {
@@ -75,7 +77,7 @@ For *Claude Desktop* or *Cursor*, add the following to your MCP server settings:
 }
 ----
 
-Once connected, ask your AI assistant: _"List all pods in namespace openshift-lightspeed"_ and verify it returns results without you running any `oc` commands.
+. Verify the connection by asking your AI assistant: _"List all pods in namespace openshift-lightspeed"_ and confirm it returns results without you running any `oc` commands.
 
 
 === Exercise 2: AI-Assisted Log Retrieval
@@ -87,38 +89,40 @@ Your environment includes a demo namespace `mcp-demo-logs` with two pods:
 * `healthy-pod` — streams INFO-level request logs every 5 seconds
 * `failing-pod` — crashes in a loop with database connection timeout errors (CrashLoopBackOff)
 
-Using your connected AI client, ask:
+//-
 
-* _"Show me the logs for the failing pod in namespace mcp-demo-logs"_
+. Using your connected AI client, ask:
++
+_"Show me the logs for the failing pod in namespace mcp-demo-logs"_
 
-The AI should:
+. Observe how the AI responds. It should:
++
+.. Call `pods_list_in_namespace` to discover pod statuses
+.. Identify `failing-pod` as the non-Running pod
+.. Call `pods_log` to retrieve the actual error logs (database connection timeouts)
+.. Clearly distinguish the healthy pod from the failing one
 
-. Call `pods_list_in_namespace` to discover pod statuses
-. Identify `failing-pod` as the non-Running pod
-. Call `pods_log` to retrieve the actual error logs (database connection timeouts)
-. Clearly distinguish the healthy pod from the failing one
-
-You can also try: _"Are there any pods in CrashLoopBackOff across the cluster?"_
-
+. You can also try: _"Are there any pods in CrashLoopBackOff across the cluster?"_
++
 NOTE: It is normal to see CrashLoopBackOff pods — these are intentional fixtures used in other exercises.
 
 === Exercise 3: Create a Resource via AI
 
 The MCP server supports resource creation through natural language. This demonstrates how AI can translate intent into valid Kubernetes YAML and apply it.
 
-Ask your AI assistant:
+. Ask your AI assistant:
++
+_"Create a ConfigMap named test-config in namespace default with key app.properties and value environment=staging"_
 
-* _"Create a ConfigMap named test-config in namespace default with key app.properties and value environment=staging"_
-
-Then verify it was created:
-
+. Verify it was created:
++
 [source,bash,role="copypaste"]
 ----
 oc get cm test-config -n default -o yaml
 ----
 
-Clean up when done:
-
+. Clean up when done:
++
 [source,bash,role="copypaste"]
 ----
 oc delete cm test-config -n default
@@ -128,23 +132,33 @@ oc delete cm test-config -n default
 
 In production environments, not every user should have write access. The MCP server enforces OpenShift RBAC per-user via bearer token passthrough — a read-only user cannot create, modify, or delete resources even when asking the AI to do so.
 
-Generate a token for the `mcp-viewer` user (has read-only access):
-
+. Generate a token for the `mcp-viewer` user (has read-only access):
++
 [source,bash,role="copypaste",subs="+attributes"]
 ----
 oc login -u mcp-viewer -p mcpviewerpass
+echo "============================================================"
 echo "Your mcp-viewer token: $(oc whoami -t)"
+echo "============================================================"
 oc login -u {openshift_cluster_admin_username} -p {openshift_cluster_admin_password}
 ----
 
-Update your AI client configuration to use the `mcp-viewer` token, then try:
+. Update your AI client configuration to use the `mcp-viewer` token.
 
-* _"List all pods in the mcp-demo-logs namespace"_ — this should succeed (read operations work)
-* _"Delete the pod healthy-pod in namespace mcp-demo-logs"_ — this should fail with a permissions error
-* _"Create a ConfigMap named hack in namespace default"_ — this should also fail
+. Try a read operation — this should succeed:
++
+_"List all pods in the mcp-demo-logs namespace"_
 
-The AI should report a clear 403 Forbidden error indicating insufficient permissions (e.g., `cannot delete resource "pods"`). The `healthy-pod` should remain Running.
+. Try a write operation — this should fail with a permissions error:
++
+_"Delete the pod healthy-pod in namespace mcp-demo-logs"_
 
+. Try another write operation — this should also fail:
++
+_"Create a ConfigMap named hack in namespace default"_
+
+. Verify the AI reports a clear 403 Forbidden error indicating insufficient permissions (e.g., `cannot delete resource "pods"`). The `healthy-pod` should remain Running.
++
 IMPORTANT: Switch your AI client back to the `mcp-admin` token (from Exercise 1) before continuing. The remaining exercises require write access and will fail with the `mcp-viewer` token.
 
 === Exercise 5: Query Prometheus Metrics
@@ -156,29 +170,31 @@ Your environment includes a `mcp-demo-production` namespace with CPU-intensive w
 * `app-api` — 2 replicas generating moderate CPU load
 * `app-worker` — 2 replicas generating heavy CPU load
 
+//-
+
 NOTE: Wait at least 10 minutes after environment provisioning for Prometheus to collect enough metrics data.
 
-Using your AI client ask:
-
-* _"Show me CPU usage for all pods in namespace mcp-demo-production over the last hour, focusing on high-usage pods"_
-
+. Using your AI client, ask:
++
+_"Show me CPU usage for all pods in namespace mcp-demo-production over the last hour, focusing on high-usage pods"_
++
 The AI should call `list_metrics` to verify the metric name, then `execute_range_query` with a PromQL query like `rate(container_cpu_usage_seconds_total{namespace="mcp-demo-production"}[5m])` to return per-pod CPU data. You should see `app-worker` pods using more CPU than `app-api` pods.
 
-Cross-check results in the OpenShift Console: *Observe > Metrics*, then paste:
-
+. Cross-check results in the OpenShift Console: *Observe > Metrics*, then paste:
++
 [source,text,role="copypaste"]
 ----
 rate(container_cpu_usage_seconds_total{namespace="mcp-demo-production"}[5m])
 ----
-
++
 image::mcp-server-metrics-console.png[Prometheus metrics query in OpenShift Console showing CPU usage for mcp-demo-production pods,link=_images/mcp-server-metrics-console.png,window=_blank]
 
-You can also try: _"Are there any firing alerts in the cluster?"_
-
+. You can also try: _"Are there any firing alerts in the cluster?"_
++
 NOTE: It is normal to see firing alerts — some are generated by intentional demo fixtures used in other exercises.
 
-Once you have finished exploring metrics, scale down the CPU-burning workloads to free up cluster resources:
-
+. Once you have finished exploring metrics, scale down the CPU-burning workloads to free up cluster resources:
++
 [source,bash,role="copypaste"]
 ----
 oc scale deployment app-api app-worker -n mcp-demo-production --replicas=0
@@ -193,14 +209,16 @@ Your environment includes a `mcp-demo-network` namespace with a deliberately fai
 * A `NetworkAttachmentDefinition` named `sriov-network` configured for an SR-IOV CNI plugin
 * A `sriov-test-pod` that requests this network attachment — it will be stuck in `ContainerCreating` because the SR-IOV CNI plugin is not installed on the nodes
 
-Using your AI client, ask:
+//-
 
-* _"Check OVN network status and show me any failed network attachments in the mcp-demo-network namespace"_
-
+. Using your AI client, ask:
++
+_"Check OVN network status and show me any failed network attachments in the mcp-demo-network namespace"_
++
 The AI should call `events_list` to surface the `FailedCreatePodSandBox` warning event with the root cause: `failed to find plugin "sriov" in path`. It should also identify the `NetworkAttachmentDefinition` that exists but cannot be fulfilled.
 
-You can also try general network diagnostics:
-
+. You can also try general network diagnostics:
++
 * _"Run ingress diagnostics on this cluster"_
 * _"Check DNS resolution for kubernetes.default.svc"_
 
@@ -208,27 +226,27 @@ You can also try general network diagnostics:
 
 In environments with write access, it's important that AI assistants warn users before executing potentially destructive operations. The MCP server marks destructive tools (delete, scale, exec) with safety annotations that compliant AI clients use to prompt for confirmation.
 
-Using your AI client ask:
-
-* _"Delete the namespace mcp-demo-production"_
-
+. Using your AI client, ask:
++
+_"Delete the namespace mcp-demo-production"_
++
 The AI should *not* immediately delete the namespace. Instead, it should warn you about the consequences — the `mcp-demo-production` namespace contains real workloads (`app-api` and `app-worker` deployments with running replicas) that would be permanently removed. The AI should ask for explicit confirmation before proceeding.
-
++
 IMPORTANT: Type *cancel* or *no* to abort. Do not actually delete this namespace — it is used by Exercise 5.
 
-Try other phrasings to test the safety boundary:
-
+. Try other phrasings to test the safety boundary:
++
 * _"Delete the healthy-pod in namespace mcp-demo-logs"_
 * _"Remove all pods in the mcp-demo-logs namespace"_
-
++
 Each should trigger a confirmation prompt before execution. Cancel each one to keep the demo environment intact.
 
 === Exercise 8: Read-Only Mode
 
 For compliance and security-sensitive environments, the MCP server can be placed in read-only mode at the server level. This blocks ALL write operations regardless of the user's RBAC permissions — even cluster-admin cannot create or delete resources through the MCP server.
 
-Enable read-only mode:
-
+. Enable read-only mode:
++
 [source,bash,role="copypaste"]
 ----
 oc patch deployment openshift-mcp-server -n openshift-mcp \
@@ -236,19 +254,25 @@ oc patch deployment openshift-mcp-server -n openshift-mcp \
   -p='[{"op":"add","path":"/spec/template/spec/containers/0/args/-","value":"--read-only"}]'
 oc rollout status deployment openshift-mcp-server -n openshift-mcp --timeout=120s
 ----
-
++
 In read-only mode, write tools are *hidden entirely* — not just blocked. The tool count drops from 39 to approximately 32 (the 4 write tools `pods_delete`, `resources_create_or_update`, `resources_delete`, and `resources_scale` disappear from the tool list).
-
++
 NOTE: Most MCP clients cache the tool list at connect time. After enabling read-only mode, you will need to remove and re-add the MCP server in your AI client to see the updated tool count.
 
-Using your AI client, try each of these write prompts:
+. Try a write prompt — should fail with "unknown tool":
++
+_"Create a deployment named test-deploy in namespace default"_
 
-* _"Create a deployment named test-deploy in namespace default"_ — should fail with "unknown tool"
-* _"Delete the pod test-pod in namespace sandbox"_ — should fail with "unknown tool"
-* _"List all pods in the mcp-demo-logs namespace"_ — should succeed (read operations still work)
+. Try another write prompt — should also fail:
++
+_"Delete the pod test-pod in namespace sandbox"_
 
-When done, restore write mode by removing the `--read-only` flag:
+. Try a read prompt — should succeed:
++
+_"List all pods in the mcp-demo-logs namespace"_
 
+. When done, restore write mode by removing the `--read-only` flag:
++
 [source,bash,role="copypaste"]
 ----
 oc patch deployment openshift-mcp-server -n openshift-mcp \
