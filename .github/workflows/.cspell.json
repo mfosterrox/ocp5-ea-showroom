@@ -91,7 +91,8 @@
     "Limitador",
     "precheck",
     "prechecks",
-    "prereqs"
+    "prereqs",
+    "crashlooping"
   ],
   "ignorePaths": [
     "node_modules/**",
