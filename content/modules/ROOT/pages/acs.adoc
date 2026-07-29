@@ -22,14 +22,8 @@ Each of these features is covered in more detail in the following sections. Part
 
 == Environment checks to make sure you're ready to go
 
-* Verify the prebuilt VM is running:
-+
-[source,bash,role="copypaste"]
-----
-oc get vmi -n acs-virt
-----
-
 * Confirm you can open the OpenShift console and ACS Central tabs in the Showroom UI
+
 * Log in to ACS Central (admin / `{common_password}`):
 +
 [source,text,role="copypaste",subs="+attributes"]
@@ -38,6 +32,41 @@ https://central-acs.{openshift_cluster_ingress_domain}
 ----
 
 * Verify the Secured Cluster is connected: navigate to *Platform Configuration > Clusters* in ACS Central and confirm the Secured Cluster is listed.
+
+* Verify the prebuilt VM is running:
++
+[source,bash,role="copypaste"]
+----
+oc get vmi -n acs-virt
+----
++
+You should see `rhel9-vm` in a `Running` phase.
+
+* Deploy the RHACS / OpenShift Security Roadshow demo applications (intentionally vulnerable workloads for ACS testing) from https://github.com/mfosterrox/demo-applications[demo-applications^]:
++
+[source,bash,role="copypaste"]
+----
+git clone https://github.com/mfosterrox/demo-applications.git
+cd demo-applications
+oc apply -f k8s-deployment-manifests/-namespaces/
+oc apply -R -f k8s-deployment-manifests/juice-shop/
+oc apply -R -f k8s-deployment-manifests/log4shell/
+oc apply -R -f k8s-deployment-manifests/webgoat/
+oc apply -R -f k8s-deployment-manifests/dvwa/
+oc apply -R -f k8s-deployment-manifests/medical-application/
+oc apply -R -f k8s-deployment-manifests/emojivoto/
+----
++
+
+* Verify the ACS MCP server is available:
++
+[source,bash,role="copypaste"]
+----
+oc get pods -n acs-mcp
+oc get route -n acs-mcp
+----
++
+NOTE: If your cluster uses a different MCP namespace (for example `stackrox-mcp`), adjust the commands: `oc get pods,route -A | grep -i acs-mcp`.
 
 == Hands-on Exercises
 
