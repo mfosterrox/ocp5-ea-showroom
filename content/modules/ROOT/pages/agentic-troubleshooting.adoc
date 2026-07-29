@@ -101,6 +101,8 @@ image::agentic-troubleshooting-mitigation-plan.png[Lightspeed mitigation plan ou
 +
 NOTE: Do not execute the remediation steps manually. In Exercise 4, the agentic system will provide a more structured way to review and execute remediation plans with full audit trails.
 
+This conversational approach to troubleshooting means SREs can investigate complex issues without memorizing `oc` commands, PromQL syntax, or navigating between multiple console views. Lightspeed handles the tool orchestration while the SRE focuses on understanding the problem and deciding what to do about it.
+
 === Exercise 2: Investigate a Critical Alert (User-Initiated)
 
 This exercise validates Lightspeed's ability to correlate standard infrastructure alerts and provide actionable remediation guidance.
@@ -117,11 +119,13 @@ Lightspeed will use multiple tools, examine pod state and logs, correlate Promet
 +
 image::agentic-troubleshooting-alert-investigation.png[Lightspeed alert investigation results,link=_images/agentic-troubleshooting-alert-investigation.png,window=_blank]
 
+Whether the starting point is a firing Prometheus alert or a vague symptom like "things are slow," Lightspeed follows the same investigative process — correlating multiple data sources to surface the root cause. This makes it equally effective for known alerts and novel issues that don't yet have monitoring coverage.
+
 === Exercise 3: Generate Inline Perses Charts (User-Initiated)
 
 OpenShift Lightspeed can dynamically generate interactive Perses charts directly in the chat UI, making it easy to visualize metrics during a troubleshooting session.
 
-. First, create a Perses dashboard to receive exported charts. Navigate to *Observe > Dashboards (Perses)* and click **Create** to create a new dashboard named `Investigation Hub`. Select the 
+. First, create a Perses dashboard to receive exported charts. Navigate to *Observe > Dashboards (Perses)* and click *Create* to create a new dashboard named `Investigation Hub`. Select the `payments` namespace.
 +
 image::agentic-troubleshooting-create-dashboard.png[Creating a Perses dashboard,link=_images/agentic-troubleshooting-create-dashboard.png,window=_blank]
 
@@ -142,6 +146,8 @@ image::agentic-troubleshooting-perses-inline.png[Inline Perses chart in Lightspe
 . Click the *Add To Dashboard* button on the chart to export it to your `Investigation Hub` dashboard. The chart is now persisted and can be revisited at any time under *Observe > Dashboards (Perses)* to see updated metrics.
 +
 image::agentic-troubleshooting-add-to-dashboard.png[Add To Dashboard button on inline Perses chart,link=_images/agentic-troubleshooting-add-to-dashboard.png,window=_blank]
+
+This workflow allows SREs to dynamically construct useful dashboards through natural language — no need to hand-craft PromQL queries or manually configure chart panels. As investigations evolve, charts can be added incrementally, building a living dashboard that captures the metrics most relevant to the issue at hand. These dashboards persist beyond the chat session and continue to show updated metrics, serving as a reference for ongoing monitoring or future incidents.
 
 === Exercise 4: Enable Automatic Agentic Runs from Alerts
 
@@ -172,6 +178,8 @@ image::agentic-troubleshooting-agentic-run-detail.png[AgenticRun detail with pro
 . Once the remediation and validation is complete, the AgenticRun status will update to *Completed* with a detailed post-execution summary.
 +
 image::agentic-troubleshooting-execution-complete.png[Completed AgenticRun with execution summary,link=_images/agentic-troubleshooting-execution-complete.png,window=_blank]
+
+This is the full agentic loop — from alert detection through investigation, proposal, approval, and execution — with a human in the loop at every decision point. The system handles the heavy lifting of data correlation and remediation execution, while the operations team retains full control over what changes are made to the cluster.
 
 == Key Takeaways
 
