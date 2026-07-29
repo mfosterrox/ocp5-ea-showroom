@@ -16,9 +16,7 @@ Red Hat Advanced Cluster Security (ACS) 5 introduces several new capabilities fo
 
 Each of these features is covered in more detail in the following sections. Part of each walkthrough will be to discuss how the feature is setup, how it works, and how it can be used to secure your environment.
 
-----
-*We ask that you provide feedback on the feature by completing the structured feedback form at the end of each exercise.*
-----
+*The ACS team asks that you provide feedback on the feature by completing the structured feedback form at the end of each exercise.*
 
 == Environment checks to make sure you're ready to go
 
@@ -35,7 +33,7 @@ https://central-acs.{openshift_cluster_ingress_domain}
 
 * Verify the prebuilt VM is running:
 +
-[source,bash,role="copypaste"]
+[source,bash,role="execute"]
 ----
 oc get vmi -n acs-virt
 ----
@@ -44,7 +42,7 @@ You should see `rhel9-vm` in a `Running` phase.
 
 * Deploy the RHACS / OpenShift Security Roadshow demo applications (intentionally vulnerable workloads for ACS testing) from https://github.com/mfosterrox/demo-applications[demo-applications^]:
 +
-[source,bash,role="copypaste"]
+[source,bash,role="execute"]
 ----
 git clone https://github.com/mfosterrox/demo-applications.git
 cd demo-applications
@@ -60,36 +58,118 @@ oc apply -R -f k8s-deployment-manifests/emojivoto/
 
 * Verify the ACS MCP server is available:
 +
-[source,bash,role="copypaste"]
+[source,bash,role="execute"]
 ----
 oc get pods -n acs-mcp
 oc get route -n acs-mcp
 ----
 +
-NOTE: If your cluster uses a different MCP namespace (for example `stackrox-mcp`), adjust the commands: `oc get pods,route -A | grep -i acs-mcp`.
+Output should look like this:
++
+[source,bash]
+----
+oc get route -n acs-mcp
+NAME                                          READY   STATUS      RESTARTS   AGE
+acs-mcp-server-stackrox-mcp-b79597899-lz64s   1/1     Running     0          3h5m
+copy-central-ca-8jrsn                         0/1     Completed   0          178m
+NAME                          HOST/PORT                                                                    PATH   SERVICES                      PORT    TERMINATION          WILDCARD
+acs-mcp-server-stackrox-mcp   acs-mcp-server-stackrox-mcp-acs-mcp.apps.ocp.2bfz7.sandbox5240.opentlc.com          acs-mcp-server-stackrox-mcp   https   reencrypt/Redirect   None
+----
++
 
 == Hands-on Exercises
 
 === Exercise 1: VM Vulnerability Management
 
-In this exercise you will prove that ACS extends vulnerability scanning to OpenShift Virtualization workloads. Complete *Part A* (required) using the prebuilt `rhel9-vm`. *Part B* is optional if you want to onboard a second VM yourself.
+In this exercise you will walk through the ACS 5 vulnerability scanning capabilities for OpenShift Virtualization workloads.
 
-==== Part A: Verify the prebuilt VM in ACS
+==== Understanding the prerequisites for VM vulnerability scanning
 
+Before you verify the prebuilt VM, review what RHACS requires to scan OpenShift Virtualization workloads. These conditions are already met in this lab for `rhel9-vm`.
+
+For full product details, see the link:https://docs.redhat.com/en/documentation/red_hat_advanced_cluster_security_for_kubernetes/4.10/html-single/operating/index#scanning-virtual-machines_examine-images-for-vulnerabilities[Scanning virtual machines^] topic in the RHACS 4.10 Operating guide.
+
+.How RHACS scans virtual machines
+
+RHACS collects, processes, and analyzes VM package data with these components:
+
+`roxagent`::
+Binary that runs inside the VM. It scans installed packages, creates index reports, and sends them to the relay.
+
+Relay::
+Node-level Collector component that receives index reports over VSOCK and forwards them to Sensor.
+
+Sensor::
+Cluster-level component that aggregates VM data with Kubernetes API information and sends it to Central.
+
+Central::
+Stores VM information, matches packages against known CVEs (via Scanner V4), and exposes results in the RHACS portal and API.
+
+.Prerequisites
+
+OpenShift Virtualization and RHACS must meet the following requirements:
+
+* The OpenShift Virtualization Operator is installed on the cluster you want to scan.
+* The `HyperConverged` resource is patched to enable virtual socket (vsock) support.
+* The RHACS feature flag `ROX_VIRTUAL_MACHINES=true` is set on the Central container, the Sensor container, and the Compliance container in the Collector pod.
+
+Each VM to be scanned must meet the following requirements:
+
+* The VM runs Red Hat Enterprise Linux (RHEL) and is registered with Red Hat Subscription Manager with an active RHEL subscription.
+* VSOCK is enabled on the VM with `spec.domain.devices.autoattachVSOCK: true`.
+* The VM has internet access to download repository-to-Common Platform Enumeration (CPE) mappings.
+* DNF is installed.
+* `roxagent` runs with privileges sufficient to scan package databases and send index reports over a privileged port (typically root or sudo).
+
+NOTE: In the next part of this exercise you create a second VM and apply the same techniques covered here.
+
+==== Verifying and reviewing the prebuilt VM in ACS
+
+.Procedure
 . Confirm the prebuilt VM instance is running:
 +
-[source,bash,role="copypaste"]
+[source,bash,role="execute"]
 ----
 oc get vmi -n acs-virt
 ----
 +
+Output:
+[source,bash]
+----
+oc get vmi -n acs-virt
+NAME       AGE     PHASE     IP            NODENAME
+rhel9-vm   10m     Running   10.129.2.10   ip-10-0-161-177.ec2.internal
+----
++
 You should see `rhel9-vm` in a `Running` phase. You can also confirm in the OpenShift console under *Virtualization > VirtualMachines*.
 
-. Open the guest console for `rhel9-vm`:
+. In the OpenShift console, go to *Virtualization > VirtualMachines* and select the `acs-virt` project.
 +
-In the OpenShift console, go to *Virtualization > VirtualMachines > rhel9-vm > Console*.
+Confirm that `rhel9-vm` is listed and shows a *Running* status.
 +
-Log in with `{vm_user}` / `{vm_password}`.
+image::acs-vm-openshift-virtualmachines.png[OpenShift console VirtualMachines page showing rhel9-vm Running in the acs-virt project,link=_images/acs-vm-openshift-virtualmachines.png,window=_blank]
+
+. Open the web console for `rhel9-vm` and log in:
++
+On the `rhel9-vm` overview, use *Open web console* (or open the *Console* tab).
++
+Log in with the following credentials:
++
+Username:
++
+[source,text,role="copypaste",subs="+attributes"]
+----
+{vm_user}
+----
++
+Password:
++
+[source,text,role="copypaste",subs="+attributes"]
+----
+{vm_password}
+----
++
+Run the remaining guest commands in this procedure from the VM console, not from the Showroom terminal.
 
 . Verify that `roxagent` is installed and healthy inside the VM:
 +
@@ -103,122 +183,211 @@ systemctl status roxagent.service
 journalctl -u roxagent.service --no-pager -n 20
 ----
 +
-The service should be active (or recently successful via the systemd timer). The journal should show scan activity without persistent connection errors to the collector relay over VSOCK.
-
-. Optionally trigger an immediate scan so results refresh sooner:
-+
-[source,bash,role="copypaste"]
-----
-sudo systemctl start roxagent.service
-----
-+
-[source,bash,role="copypaste"]
-----
-sudo journalctl -u roxagent.service --no-pager -n 30
-----
+NOTE: The service should be active (or recently successful via the systemd timer). The journal should show scan activity without persistent connection errors to the collector relay over VSOCK.
 
 . In ACS Central, open *Vulnerability Management > Results > Virtual Machines*.
 +
-Locate the entry for the `rhel9-vm` workload in the `acs-virt` namespace. Open it and review reported CVEs and installed packages.
-
-. Compare the experience to container image results under *Vulnerability Management*.
+You should see the `rhel9-vm` workload listed for the `acs-virt` namespace, including CVE counts by severity.
 +
-You should see both container and VM findings in the same ACS console — without a separate VM-only scanning product.
+image::acs-vm-vulnerabilities-list.png[ACS Virtual machine vulnerabilities page listing rhel9-vm with CVE severity counts,link=_images/acs-vm-vulnerabilities-list.png,window=_blank]
 
-What you just proved:: `roxagent` inside the guest scanned RPM/DNF packages, reported over VSOCK to the ACS collector relay, and Central presented unified vulnerability results for the virtual machine.
+. Click `rhel9-vm` and review the reported CVEs and related details.
++
+Use the *Vulnerabilities*, *Components*, and *Details* tabs to explore findings for the guest OS.
++
+image::acs-vm-rhel9-cve-details.png[ACS vulnerability details for rhel9-vm showing CVE severity summary and CVE table,link=_images/acs-vm-rhel9-cve-details.png,window=_blank]
 
-==== Part B (Optional): Create and onboard a second VM
+==== Create and onboard a second VM (Optional)
 
-Use this path if you want to walk through VM creation and `roxagent` installation yourself. Schedule the VM on a *worker* node (the collector relay is not enabled on control-plane nodes by default).
+In this optional path you deploy a second VirtualMachine from a declarative GitOps-style manifest, focus on the fields that matter for ACS vulnerability scanning, apply the YAML, then reach the guest web server.
 
-. Create a second VirtualMachine by cloning the prebuilt definition and renaming it (keeps the same containerDisk image, cloud-init pattern, and VSOCK settings):
+IMPORTANT: Schedule the VM on a *worker* node. The ACS collector relay is not enabled on control-plane nodes by default.
+
+. Review the VirtualMachine manifest sections that matter for ACS vulnerability scanning:
++
+* *VSOCK* — `spec.template.spec.domain.devices.autoattachVSOCK: true` so `roxagent` can send index reports to the collector relay.
+* *RHEL guest with subscription and DNF* — ACS VM scanning supports RHEL packages indexed by DNF with valid repository links. Cloud-init registers the guest and enables RHEL repos so scans can map packages to CVEs.
+* *`roxagent` in the guest* — cloud-init runs `init-vm.sh`, which installs `roxagent` and schedules it to report package inventory to ACS.
++
+[source,yaml]
+----
+devices:
+  autoattachVSOCK: true
+----
+
+. Apply the VirtualMachine manifest (the same GitOps example stored at `acs-virt/examples/rhel-webserver-vm.yaml` in https://github.com/rhpds/ocp5-ea-gitops[ocp5-ea-gitops^]):
++
+[source,bash,role="execute"]
+----
+oc apply -f - <<'EOF'
+apiVersion: kubevirt.io/v1
+kind: VirtualMachine
+metadata:
+  name: rhel-webserver
+  namespace: acs-virt
+  labels:
+    app: rhel-webserver
+spec:
+  runStrategy: Always
+  template:
+    metadata:
+      labels:
+        kubevirt.io/domain: rhel-webserver
+        kubevirt.io/size: small
+    spec:
+      domain:
+        cpu:
+          cores: 1
+          sockets: 1
+          threads: 1
+        devices:
+          autoattachVSOCK: true
+          disks:
+            - bootOrder: 1
+              disk:
+                bus: virtio
+              name: rootdisk
+            - disk:
+                bus: virtio
+              name: cloudinitdisk
+          interfaces:
+            - masquerade: {}
+              model: virtio
+              name: default
+          rng: {}
+        features:
+          acpi: {}
+          smm:
+            enabled: true
+        firmware:
+          bootloader:
+            efi: {}
+        machine:
+          type: pc-q35-rhel9.6.0
+        memory:
+          guest: 2Gi
+      networks:
+        - name: default
+          pod: {}
+      terminationGracePeriodSeconds: 180
+      volumes:
+        - dataVolume:
+            name: rhel-webserver-volume
+          name: rootdisk
+        - name: cloudinitdisk
+          cloudInitNoCloud:
+            userData: |-
+              #cloud-config
+              user: cloud-user
+              password: redhat
+              chpasswd: { expire: false }
+              runcmd:
+                - curl -k -o /tmp/katello-ca-consumer-latest.noarch.rpm https://demosat-ha.infra.demo.redhat.com/pub/katello-ca-consumer-latest.noarch.rpm
+                - rpm -Uvh /tmp/katello-ca-consumer-latest.noarch.rpm
+                - |
+                  subscription-manager register \
+                    --activationkey="demosat-smt-lb1161-wolfgang" \
+                    --org="Red_Hat_RHDP_Labs" \
+                    --name="rhel-webserver-68q9h-2" \
+                    --force
+                - subscription-manager release --set=10
+                - |
+                  subscription-manager repos \
+                      --enable=rhel-10-for-x86_64-baseos-rpms \
+                      --enable=rhel-10-for-x86_64-appstream-rpms
+                - curl -sL -o /tmp/init.sh https://raw.githubusercontent.com/rhpds/sovereign-cloud-showroom/refs/heads/main/scripts/init-vm.sh
+                - chmod +x /tmp/init.sh
+                - /tmp/init.sh
+                - systemctl enable --now httpd
+                - echo '<h1>rhel-webserver</h1><p>ACS VM scanning demo</p>' > /var/www/html/index.html
+                - echo "Setup complete"
+  dataVolumeTemplates:
+  - metadata:
+      name: rhel-webserver-volume
+    spec:
+      sourceRef:
+        kind: DataSource
+        name: rhel10
+        namespace: openshift-virtualization-os-images
+      storage:
+        resources:
+          requests:
+            storage: 30Gi
+EOF
+----
+
+. Wait until the VirtualMachineInstance is running:
++
+[source,bash,role="execute"]
+----
+oc get vmi rhel-webserver -n acs-virt -w
+----
++
+Wait until `PHASE` shows `Running`, then press kbd:[Ctrl+C].
++
+TIP: First boot can take several minutes while cloud-init registers the system, enables repos, installs packages, and starts `httpd`.
+
+. Confirm the DataVolume completed and note the guest IP:
++
+[source,bash,role="execute"]
+----
+oc get dv,vmi rhel-webserver -n acs-virt
+oc get vmi rhel-webserver -n acs-virt -o jsonpath='{.status.interfaces[0].ipAddress}{"\n"}'
+----
+
+. Access the guest web server from the Showroom terminal using the VMI IP:
++
+[source,bash,role="execute"]
+----
+VM_IP=$(oc get vmi rhel-webserver -n acs-virt -o jsonpath='{.status.interfaces[0].ipAddress}')
+echo "VM IP: ${VM_IP}"
+curl -I "http://${VM_IP}/"
+curl "http://${VM_IP}/"
+----
++
+You should see an HTTP `200` response and a short HTML page that identifies `rhel-webserver`.
++
+If `curl` fails, open the guest console (*Virtualization > VirtualMachines > rhel-webserver > Console*) and log in to check cloud-init and `httpd`:
++
+Username:
++
+[source,text,role="copypaste"]
+----
+cloud-user
+----
++
+Password:
++
+[source,text,role="copypaste"]
+----
+redhat
+----
 +
 [source,bash,role="copypaste"]
 ----
-oc get vm rhel9-vm -n acs-virt -o yaml \
-  | sed -e 's/name: rhel9-vm/name: rhel9-web/' \
-        -e '/resourceVersion:/d' \
-        -e '/uid:/d' \
-        -e '/creationTimestamp:/d' \
-        -e '/generation:/d' \
-        -e '/managedFields:/,/status:/d' \
-  > /tmp/rhel9-web-vm.yaml
-
-# Ensure VSOCK is enabled (required for roxagent ↔ collector communication)
-grep -n 'autoattachVSOCK' /tmp/rhel9-web-vm.yaml
-
-oc apply -f /tmp/rhel9-web-vm.yaml
-oc get vmi rhel9-web -n acs-virt -w
-----
-+
-Wait until the VMI shows `Running`, then press kbd:[Ctrl+C].
-+
-IMPORTANT: The cloned YAML must include `spec.template.spec.domain.devices.autoattachVSOCK: true`. If `grep` finds no match, edit the VM and add it before the guest can report to ACS.
-
-. Open the guest console for `rhel9-web` (*Virtualization > VirtualMachines > rhel9-web > Console*) and log in with `{vm_user}` / `{vm_password}`.
-
-. Optional: install a simple web server so the guest feels like an application host (not required for scanning):
-+
-[source,bash,role="copypaste"]
-----
-sudo dnf install -y httpd
-sudo systemctl enable --now httpd
+sudo cloud-init status --long
+systemctl status httpd --no-pager
 curl -I http://127.0.0.1/
 ----
 
-. Install and configure `roxagent` to match the prebuilt VM pattern (native binary + systemd service/timer).
-+
-On the *prebuilt* `rhel9-vm`, capture the unit files and binary location to reuse on the new guest:
+. Optionally verify `roxagent` inside the guest (installed by `init-vm.sh` on a cron schedule):
 +
 [source,bash,role="copypaste"]
 ----
-systemctl cat roxagent.service
+command -v roxagent
+sudo /usr/local/bin/roxagent --daemon
+sudo journalctl -t roxagent --no-pager -n 20 2>/dev/null || sudo tail -n 20 /var/log/messages
 ----
-+
-[source,bash,role="copypaste"]
-----
-systemctl cat roxagent.timer
-----
-+
-[source,bash,role="copypaste"]
-----
-command -v roxagent || ls -la /usr/local/bin/roxagent
-----
-+
-On `rhel9-web`, download the agent from the OpenShift mirror (adjust the version path if your EA build differs), install it, and enable the same systemd units you inspected:
-+
-[source,bash,role="copypaste"]
-----
-# Example mirror path — confirm the version against the prebuilt VM or your EA guidance
-curl -L -f -o /tmp/roxagent \
-  https://mirror.openshift.com/pub/rhacs/assets/4.10.0/bin/Linux/roxagent
-chmod +x /tmp/roxagent
-sudo mv /tmp/roxagent /usr/local/bin/roxagent
-sudo restorecon -v /usr/local/bin/roxagent 2>/dev/null || true
-----
-+
-Recreate `roxagent.service` and `roxagent.timer` using the content from the prebuilt VM, then:
-+
-[source,bash,role="copypaste"]
-----
-sudo systemctl daemon-reload
-sudo systemctl enable --now roxagent.timer
-sudo systemctl start roxagent.service
-systemctl status roxagent.service
-journalctl -u roxagent.service --no-pager -n 30
-----
-+
-NOTE: The prebuilt environment uses a systemd timer (`OnBootSec=5min`, `OnUnitActiveSec=3h40m`) with `Restart=on-failure` / `RestartSec=60`. Prefer copying those unit files exactly from `rhel9-vm` rather than inventing new ones.
 
-. Return to ACS Central → *Vulnerability Management > Results > Virtual Machines* and confirm `rhel9-web` appears alongside `rhel9-vm`.
+. Return to ACS Central → *Vulnerability Management > Results > Virtual Machines* and confirm `rhel-webserver` appears alongside `rhel9-vm`.
 +
-Allow a few minutes for the first report to arrive after the scan completes.
+Allow several minutes after the first successful `roxagent` run for results to show.
 
-. When finished experimenting, you can leave `rhel9-web` running or delete it:
+. When finished experimenting, you can leave `rhel-webserver` running or delete it:
 +
-[source,bash,role="copypaste"]
+[source,bash,role="execute"]
 ----
-oc delete vm rhel9-web -n acs-virt
+oc delete vm rhel-webserver -n acs-virt
 ----
 +
 NOTE: VM scanning is a Technology Preview capability in this EAP. Do not delete the prebuilt `rhel9-vm`.
@@ -228,7 +397,7 @@ NOTE: VM scanning is a Technology Preview capability in this EAP. Do not delete 
 After completing Part A (and Part B if you ran it), capture feedback for the product team:
 
 * Did the prebuilt `rhel9-vm` results appear in ACS without additional ACS UI configuration?
-* If you completed Part B: roughly how many minutes from VM create → first visible result in ACS?
+* If you created `rhel-webserver`: roughly how many minutes from apply → first visible result in ACS?
 * Was the `roxagent` install and VSOCK requirement clear enough to operationalize?
 * Compared with any existing VM scanners you use, what gaps remain (coverage, UX, day-2 ops)?
 * Would unified container + VM visibility in ACS replace a separate VM scanning tool in your organization?
