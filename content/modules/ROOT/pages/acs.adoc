@@ -14,26 +14,195 @@ Red Hat Advanced Cluster Security (ACS) 5 introduces several new capabilities fo
 
 . *ACS MCP Server* — exposes ACS Vulnerability Management and Configuration Management APIs as MCP tools, allowing AI agents to interact programmatically with security data.
 
+Each of these features is covered in more detail in the following sections. Part of each walkthrough will be to discuss how the feature is setup, how it works, and how it can be used to secure your environment.
 
-== Before You Begin
+----
+*We ask that you provide feedback on the feature by completing the structured feedback form at the end of each exercise.*
+----
 
-* Log in to ACS Central: https://central-acs.{openshift_cluster_ingress_domain}[ACS Central^] (admin / `{common_password}`)
-* Verify the Secured Cluster is connected: navigate to *Platform Configuration > Clusters* in ACS Central
-* Verify the VM is running: `oc get vmi -n acs-virt`
-* Check roxagent status on the VM:
-** Connect via the OpenShift console: *Virtualization > VirtualMachines > rhel9-vm > Console*
-** Log in with `{vm_user}` / `{vm_password}`
-** Run: `systemctl status roxagent.service` and `journalctl -u roxagent.service --no-pager -n 20`
+== Environment checks to make sure you're ready to go
+
+* Verify the prebuilt VM is running:
++
+[source,bash,role="copypaste"]
+----
+oc get vmi -n acs-virt
+----
+
+* Confirm you can open the OpenShift console and ACS Central tabs in the Showroom UI
+* Log in to ACS Central (admin / `{common_password}`):
++
+[source,text,role="copypaste",subs="+attributes"]
+----
+https://central-acs.{openshift_cluster_ingress_domain}
+----
+
+* Verify the Secured Cluster is connected: navigate to *Platform Configuration > Clusters* in ACS Central and confirm the Secured Cluster is listed.
 
 == Hands-on Exercises
 
 === Exercise 1: VM Vulnerability Management
 
-In this exercise, you will verify that ACS scans a virtual machine workload and reports package vulnerabilities in ACS Central.
+In this exercise you will prove that ACS extends vulnerability scanning to OpenShift Virtualization workloads. Complete *Part A* (required) using the prebuilt `rhel9-vm`. *Part B* is optional if you want to onboard a second VM yourself.
 
-. _Step placeholder_
+==== Part A: Verify the prebuilt VM in ACS
+
+. Confirm the prebuilt VM instance is running:
 +
-NOTE: Replace with guided steps (for example, confirm `roxagent` status, trigger a scan, then open *Vulnerability Management > Results > Virtual Machines*).
+[source,bash,role="copypaste"]
+----
+oc get vmi -n acs-virt
+----
++
+You should see `rhel9-vm` in a `Running` phase. You can also confirm in the OpenShift console under *Virtualization > VirtualMachines*.
+
+. Open the guest console for `rhel9-vm`:
++
+In the OpenShift console, go to *Virtualization > VirtualMachines > rhel9-vm > Console*.
++
+Log in with `{vm_user}` / `{vm_password}`.
+
+. Verify that `roxagent` is installed and healthy inside the VM:
++
+[source,bash,role="copypaste"]
+----
+systemctl status roxagent.service
+----
++
+[source,bash,role="copypaste"]
+----
+journalctl -u roxagent.service --no-pager -n 20
+----
++
+The service should be active (or recently successful via the systemd timer). The journal should show scan activity without persistent connection errors to the collector relay over VSOCK.
+
+. Optionally trigger an immediate scan so results refresh sooner:
++
+[source,bash,role="copypaste"]
+----
+sudo systemctl start roxagent.service
+----
++
+[source,bash,role="copypaste"]
+----
+sudo journalctl -u roxagent.service --no-pager -n 30
+----
+
+. In ACS Central, open *Vulnerability Management > Results > Virtual Machines*.
++
+Locate the entry for the `rhel9-vm` workload in the `acs-virt` namespace. Open it and review reported CVEs and installed packages.
+
+. Compare the experience to container image results under *Vulnerability Management*.
++
+You should see both container and VM findings in the same ACS console — without a separate VM-only scanning product.
+
+What you just proved:: `roxagent` inside the guest scanned RPM/DNF packages, reported over VSOCK to the ACS collector relay, and Central presented unified vulnerability results for the virtual machine.
+
+==== Part B (Optional): Create and onboard a second VM
+
+Use this path if you want to walk through VM creation and `roxagent` installation yourself. Schedule the VM on a *worker* node (the collector relay is not enabled on control-plane nodes by default).
+
+. Create a second VirtualMachine by cloning the prebuilt definition and renaming it (keeps the same containerDisk image, cloud-init pattern, and VSOCK settings):
++
+[source,bash,role="copypaste"]
+----
+oc get vm rhel9-vm -n acs-virt -o yaml \
+  | sed -e 's/name: rhel9-vm/name: rhel9-web/' \
+        -e '/resourceVersion:/d' \
+        -e '/uid:/d' \
+        -e '/creationTimestamp:/d' \
+        -e '/generation:/d' \
+        -e '/managedFields:/,/status:/d' \
+  > /tmp/rhel9-web-vm.yaml
+
+# Ensure VSOCK is enabled (required for roxagent ↔ collector communication)
+grep -n 'autoattachVSOCK' /tmp/rhel9-web-vm.yaml
+
+oc apply -f /tmp/rhel9-web-vm.yaml
+oc get vmi rhel9-web -n acs-virt -w
+----
++
+Wait until the VMI shows `Running`, then press kbd:[Ctrl+C].
++
+IMPORTANT: The cloned YAML must include `spec.template.spec.domain.devices.autoattachVSOCK: true`. If `grep` finds no match, edit the VM and add it before the guest can report to ACS.
+
+. Open the guest console for `rhel9-web` (*Virtualization > VirtualMachines > rhel9-web > Console*) and log in with `{vm_user}` / `{vm_password}`.
+
+. Optional: install a simple web server so the guest feels like an application host (not required for scanning):
++
+[source,bash,role="copypaste"]
+----
+sudo dnf install -y httpd
+sudo systemctl enable --now httpd
+curl -I http://127.0.0.1/
+----
+
+. Install and configure `roxagent` to match the prebuilt VM pattern (native binary + systemd service/timer).
++
+On the *prebuilt* `rhel9-vm`, capture the unit files and binary location to reuse on the new guest:
++
+[source,bash,role="copypaste"]
+----
+systemctl cat roxagent.service
+----
++
+[source,bash,role="copypaste"]
+----
+systemctl cat roxagent.timer
+----
++
+[source,bash,role="copypaste"]
+----
+command -v roxagent || ls -la /usr/local/bin/roxagent
+----
++
+On `rhel9-web`, download the agent from the OpenShift mirror (adjust the version path if your EA build differs), install it, and enable the same systemd units you inspected:
++
+[source,bash,role="copypaste"]
+----
+# Example mirror path — confirm the version against the prebuilt VM or your EA guidance
+curl -L -f -o /tmp/roxagent \
+  https://mirror.openshift.com/pub/rhacs/assets/4.10.0/bin/Linux/roxagent
+chmod +x /tmp/roxagent
+sudo mv /tmp/roxagent /usr/local/bin/roxagent
+sudo restorecon -v /usr/local/bin/roxagent 2>/dev/null || true
+----
++
+Recreate `roxagent.service` and `roxagent.timer` using the content from the prebuilt VM, then:
++
+[source,bash,role="copypaste"]
+----
+sudo systemctl daemon-reload
+sudo systemctl enable --now roxagent.timer
+sudo systemctl start roxagent.service
+systemctl status roxagent.service
+journalctl -u roxagent.service --no-pager -n 30
+----
++
+NOTE: The prebuilt environment uses a systemd timer (`OnBootSec=5min`, `OnUnitActiveSec=3h40m`) with `Restart=on-failure` / `RestartSec=60`. Prefer copying those unit files exactly from `rhel9-vm` rather than inventing new ones.
+
+. Return to ACS Central → *Vulnerability Management > Results > Virtual Machines* and confirm `rhel9-web` appears alongside `rhel9-vm`.
++
+Allow a few minutes for the first report to arrive after the scan completes.
+
+. When finished experimenting, you can leave `rhel9-web` running or delete it:
++
+[source,bash,role="copypaste"]
+----
+oc delete vm rhel9-web -n acs-virt
+----
++
+NOTE: VM scanning is a Technology Preview capability in this EAP. Do not delete the prebuilt `rhel9-vm`.
+
+==== Structured feedback (VM Vulnerability Management)
+
+After completing Part A (and Part B if you ran it), capture feedback for the product team:
+
+* Did the prebuilt `rhel9-vm` results appear in ACS without additional ACS UI configuration?
+* If you completed Part B: roughly how many minutes from VM create → first visible result in ACS?
+* Was the `roxagent` install and VSOCK requirement clear enough to operationalize?
+* Compared with any existing VM scanners you use, what gaps remain (coverage, UX, day-2 ops)?
+* Would unified container + VM visibility in ACS replace a separate VM scanning tool in your organization?
 
 === Exercise 2: File Activity Monitoring (FAM)
 
@@ -62,12 +231,6 @@ NOTE: Replace with guided steps (for example, configure the MCP endpoint, authen
 == Other Things to Try
 
 * TBD
-
-== Known Limitations
-
-* The collector relay (which receives reports from roxagent via VSOCK) does not start on control-plane nodes unless `ROX_VIRTUAL_MACHINES_RELAY_ENABLED_ON_MASTER_NODES` is explicitly set — VMs should be scheduled on worker nodes
-* roxagent retries on failure via `Restart=on-failure` with a 60-second retry interval; the systemd timer also retries periodically
-* VM scanning is a Technology Preview feature
 
 == Key Takeaways
 
