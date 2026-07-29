@@ -33,7 +33,7 @@ https://central-acs.{openshift_cluster_ingress_domain}
 
 * Verify the prebuilt VM is running:
 +
-[source,bash,role="execute"]
+[source,sh,subs="attributes",role=execute]
 ----
 oc get vmi -n acs-virt
 ----
@@ -42,7 +42,7 @@ You should see `rhel9-vm` in a `Running` phase.
 
 * Deploy the RHACS / OpenShift Security Roadshow demo applications (intentionally vulnerable workloads for ACS testing) from https://github.com/mfosterrox/demo-applications[demo-applications^]:
 +
-[source,bash,role="execute"]
+[source,sh,subs="attributes",role=execute]
 ----
 git clone https://github.com/mfosterrox/demo-applications.git
 cd demo-applications
@@ -58,7 +58,7 @@ oc apply -R -f k8s-deployment-manifests/emojivoto/
 
 * Verify the ACS MCP server is available:
 +
-[source,bash,role="execute"]
+[source,sh,subs="attributes",role=execute]
 ----
 oc get pods -n acs-mcp
 oc get route -n acs-mcp
@@ -128,7 +128,7 @@ NOTE: In the next part of this exercise you create a second VM and apply the sam
 .Procedure
 . Confirm the prebuilt VM instance is running:
 +
-[source,bash,role="execute"]
+[source,sh,subs="attributes",role=execute]
 ----
 oc get vmi -n acs-virt
 ----
@@ -173,12 +173,12 @@ Run the remaining guest commands in this procedure from the VM console, not from
 
 . Verify that `roxagent` is installed and healthy inside the VM:
 +
-[source,bash,role="execute"]
+[source,sh,subs="attributes",role=execute]
 ----
 systemctl status roxagent.service
 ----
 +
-[source,bash,role="execute"]
+[source,sh,subs="attributes",role=execute]
 ----
 journalctl -u roxagent.service --no-pager -n 20
 ----
@@ -217,7 +217,7 @@ devices:
 
 . Apply the VirtualMachine manifest (the same GitOps example stored at `acs-virt/examples/rhel-webserver-vm.yaml` in https://github.com/rhpds/ocp5-ea-gitops[ocp5-ea-gitops^]):
 +
-[source,bash,role="execute"]
+[source,sh,subs="attributes",role=execute]
 ----
 oc apply -f - <<'EOF'
 apiVersion: kubevirt.io/v1
@@ -318,14 +318,14 @@ EOF
 
 . Wait until the VirtualMachineInstance is running:
 +
-[source,bash,role="execute"]
+[source,sh,subs="attributes",role=execute]
 ----
 oc wait --for=jsonpath='{.status.phase}'=Running vmi/rhel-webserver -n acs-virt --timeout=600s
 ----
 +
 Confirm the VMI status:
 +
-[source,bash,role="execute"]
+[source,sh,subs="attributes",role=execute]
 ----
 oc get vmi rhel-webserver -n acs-virt
 ----
@@ -336,7 +336,7 @@ TIP: First boot can take several minutes while cloud-init registers the system, 
 +
 The disk volume is named `rhel-webserver-volume` (from `dataVolumeTemplates`); the VMI is named `rhel-webserver`.
 +
-[source,bash,role="execute"]
+[source,sh,subs="attributes",role=execute]
 ----
 oc get dv rhel-webserver-volume -n acs-virt
 oc get vmi rhel-webserver -n acs-virt
@@ -344,7 +344,7 @@ oc get vmi rhel-webserver -n acs-virt
 +
 When the VMI is `Running`, get the guest IP:
 +
-[source,bash,role="execute"]
+[source,sh,subs="attributes",role=execute]
 ----
 oc get vmi rhel-webserver -n acs-virt -o jsonpath='{.status.interfaces[0].ipAddress}{"\n"}'
 ----
@@ -353,7 +353,7 @@ NOTE: If the VMI stays in `Scheduling` or `Pending`, wait for the DataVolume `PH
 
 . Access the guest web server from the Showroom terminal using the VMI IP:
 +
-[source,bash,role="execute"]
+[source,sh,subs="attributes",role=execute]
 ----
 VM_IP=$(oc get vmi rhel-webserver -n acs-virt -o jsonpath='{.status.interfaces[0].ipAddress}')
 echo "VM IP: ${VM_IP}"
@@ -451,7 +451,7 @@ This environment already enables FAM on the SecuredCluster and deploys two Secur
 
 . Confirm FAM is enabled on the SecuredCluster:
 +
-[source,bash,role="execute"]
+[source,sh,subs="attributes",role=execute]
 ----
 oc get securedcluster -n acs -o jsonpath='{.items[0].metadata.name}{"\n"}{.items[0].spec.perNode.fileActivityMonitoring.mode}{"\n"}'
 ----
@@ -474,7 +474,7 @@ TIP: The GitOps source for these policies is in the lab GitOps repository under 
 
 . Verify the payments demo workload used for the deploy trigger is running:
 +
-[source,bash,role="execute"]
+[source,sh,subs="attributes",role=execute]
 ----
 oc get deploy visa-processor -n payments
 oc get pods -n payments -l app=visa-processor -o wide
@@ -486,7 +486,7 @@ NOTE: Use the privileged `visa-processor-sidecar` container for the trigger. The
 
 . Trigger a monitored file operation inside the privileged sidecar:
 +
-[source,bash,role="execute"]
+[source,sh,subs="attributes",role=execute]
 ----
 oc exec -n payments deployment/visa-processor -c visa-processor-sidecar -- touch /etc/passwd
 ----
@@ -518,7 +518,7 @@ Use this path if you want to exercise host-level file activity. Node FAM alerts 
 
 . Trigger a host file operation via `nsenter` into PID 1 on a worker node:
 +
-[source,bash,role="execute"]
+[source,sh,subs="attributes",role=execute]
 ----
 NODE=$(oc get nodes -l node-role.kubernetes.io/worker -o jsonpath='{.items[0].metadata.name}')
 echo "Using node: ${NODE}"
@@ -589,7 +589,7 @@ OpenShift Lightspeed (in-console) or an external MCP client (Claude Code, Cursor
 
 . Confirm the MCP pod and Route:
 +
-[source,bash,role="execute"]
+[source,sh,subs="attributes",role=execute]
 ----
 oc get pods -n acs-mcp
 oc get route -n acs-mcp
@@ -597,7 +597,7 @@ oc get route -n acs-mcp
 
 . Check the health endpoint:
 +
-[source,bash,role="execute"]
+[source,sh,subs="attributes",role=execute]
 ----
 MCP_HOST=$(oc get route -n acs-mcp -o jsonpath='{.items[0].spec.host}')
 echo "MCP endpoint: https://${MCP_HOST}/mcp"
@@ -610,7 +610,7 @@ TIP: Keep the printed MCP endpoint URL — you will need it if you connect an ex
 
 . Confirm Lightspeed is wired to ACS MCP:
 +
-[source,bash,role="execute"]
+[source,sh,subs="attributes",role=execute]
 ----
 oc get olsconfig cluster -n openshift-lightspeed -o jsonpath='{range .spec.mcpServers[*]}{.name}{" -> "}{.url}{"\n"}{end}'
 oc get secret acs-mcp-api-token -n openshift-lightspeed
@@ -675,7 +675,7 @@ Copy the token value. You can also create a token in ACS Central under *Platform
 
 . Note the public MCP endpoint:
 +
-[source,bash,role="execute"]
+[source,sh,subs="attributes",role=execute]
 ----
 echo "https://$(oc get route -n acs-mcp -o jsonpath='{.items[0].spec.host}')/mcp"
 ----
