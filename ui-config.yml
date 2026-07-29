@@ -11,6 +11,12 @@ view_switcher:
   default_mode: split
 
 tabs:
+  - name: OpenShift Console
+    url: 'https://console-openshift-console.${DOMAIN}'
+  - name: Red Hat Advanced Cluster Security
+    url: 'https://central-acs.${DOMAIN}'
+  - name: OpenShift GitOps
+    url: 'https://openshift-gitops-server-openshift-gitops.${DOMAIN}'
   - name: Terminal
     path: /wetty
     port: 443
