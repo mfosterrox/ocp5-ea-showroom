@@ -27,13 +27,28 @@ These issues are designed to leave a causal trail — cascading failures with an
 
 == Before You Begin
 
-. Verify the troubleshooting applications are running:
+. Verify the troubleshooting applications are deployed. You should expect to see a mix of `Running`, `Completed`, and `ImagePullBackOff` statuses — this is intentional, as these broken states are what the agentic system will investigate:
 +
 [source,bash,role="copypaste"]
 ----
 oc get pods -n payments && \
 oc get pods -n catalog-service && \
 oc get pods -n inventory
+----
++
+.Expected output (example)
+----
+NAME                                 READY   STATUS      RESTARTS   AGE
+payments-api-c7c648878-k2rww         1/1     Running     0          4h49m
+postgres-5bd4d575fb-crf6z            2/2     Running     0          4h49m
+reporting-service-6d7f67656f-ktfck   1/1     Running     0          4h39m
+reporting-service-rollout-gg5wc      0/1     Completed   0          4h49m
+NAME                                     READY   STATUS    RESTARTS   AGE
+catalog-index-service-5b698694db-rjthx   0/1     Running   0          4h49m
+NAME                             READY   STATUS             RESTARTS   AGE
+inventory-app-764d974b4c-8wv75   0/1     ImagePullBackOff   0          4h49m
+inventory-app-764d974b4c-lj4z5   0/1     ImagePullBackOff   0          4h49m
+inventory-app-764d974b4c-wk7vr   0/1     ImagePullBackOff   0          4h49m
 ----
 
 . Check that alerts are firing by navigating to *Observe > Alerting* in the OpenShift console. Select *All Projects* from the project dropdown, and remove the *Platform* filter so that both Platform and Application alerts are visible. You should see two Critical alerts (`PaymentErrorRateHigh` and `PodDisruptionBudgetLimit`) along with other Warning and Info alerts that will be used in later exercises.
@@ -83,6 +98,8 @@ _"Identify recent changes that may have caused this and suggest remediation"_
 . Review the mitigation plan that Lightspeed provides. It should include correlation evidence and a read-only remediation plan.
 +
 image::agentic-troubleshooting-mitigation-plan.png[Lightspeed mitigation plan output,link=_images/agentic-troubleshooting-mitigation-plan.png,window=_blank]
++
+NOTE: Do not execute the remediation steps manually. In Exercise 4, the agentic system will provide a more structured way to review and execute remediation plans with full audit trails.
 
 === Exercise 2: Investigate a Critical Alert (User-Initiated)
 
