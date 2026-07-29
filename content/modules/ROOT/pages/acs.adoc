@@ -207,7 +207,7 @@ IMPORTANT: Schedule the VM on a *worker* node. The ACS collector relay is not en
 +
 * *VSOCK* — `spec.template.spec.domain.devices.autoattachVSOCK: true` so `roxagent` can send index reports to the collector relay.
 * *RHEL guest with subscription and DNF* — ACS VM scanning supports RHEL packages indexed by DNF with valid repository links. Cloud-init registers the guest and enables RHEL repos so scans can map packages to CVEs.
-* *`roxagent` in the guest* — cloud-init runs `init-vm.sh`, which installs `roxagent` and schedules it to report package inventory to ACS.
+* *`roxagent` in the guest* — cloud-init installs `roxagent` and schedules it via cron to report package inventory to ACS.
 +
 [source,yaml]
 ----
@@ -215,11 +215,12 @@ devices:
   autoattachVSOCK: true
 ----
 
-. Apply the VirtualMachine manifest (the same GitOps example stored at `acs-virt/examples/rhel-webserver-vm.yaml` in https://github.com/rhpds/ocp5-ea-gitops[ocp5-ea-gitops^]):
+. Review and apply the VirtualMachine manifest.
 +
-[source,sh,subs="attributes",role=execute]
+This YAML enables VSOCK, clones the cluster `rhel9` DataSource, registers the guest with Subscription Manager, installs demo packages, and runs `roxagent` on a cron schedule so ACS can report VM vulnerabilities:
++
+[source,yaml]
 ----
-oc apply -f - <<'EOF'
 apiVersion: kubevirt.io/v1
 kind: VirtualMachine
 metadata:
@@ -272,7 +273,7 @@ spec:
       terminationGracePeriodSeconds: 180
       volumes:
         - dataVolume:
-            name: rhel-webserver-volume
+            name: rhel-webserver
           name: rootdisk
         - name: cloudinitdisk
           cloudInitNoCloud:
@@ -290,32 +291,53 @@ spec:
                     --org="Red_Hat_RHDP_Labs" \
                     --name="rhel-webserver-68q9h-2" \
                     --force
-                - subscription-manager release --set=10
+                - subscription-manager release --set=9.6
                 - |
                   subscription-manager repos \
-                      --enable=rhel-10-for-x86_64-baseos-rpms \
-                      --enable=rhel-10-for-x86_64-appstream-rpms
-                - curl -sL -o /tmp/init.sh https://raw.githubusercontent.com/rhpds/sovereign-cloud-showroom/refs/heads/main/scripts/init-vm.sh
-                - chmod +x /tmp/init.sh
-                - /tmp/init.sh
+                    --enable=rhel-9-for-x86_64-baseos-eus-rpms \
+                    --enable=rhel-9-for-x86_64-appstream-eus-rpms
+                - dnf clean all
+                - dnf update -y
+                - |
+                  dnf install -y \
+                    httpd curl wget openssl openssl-libs zlib libxml2 \
+                    ghostscript perl nginx tar gzip nmap-ncat bzip2 zip unzip \
+                    freetype libjpeg-turbo libtiff libpng gnutls 2>/dev/null || true
+                - curl -L -f -o /tmp/roxagent https://mirror.openshift.com/pub/rhacs/assets/4.10.0/bin/linux/roxagent
+                - chmod +x /tmp/roxagent
+                - mv /tmp/roxagent /usr/local/bin/roxagent
+                - restorecon -v /usr/local/bin/roxagent
+                - |
+                  printf '%s\n' \
+                    'SHELL=/bin/bash' \
+                    'PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin' \
+                    'MAILTO=root' \
+                    '# Run roxagent every 10 minutes as root' \
+                    '*/10 * * * * root /usr/local/bin/roxagent --daemon' \
+                  | tee /etc/cron.d/roxagent > /dev/null
+                - chmod 644 /etc/cron.d/roxagent
+                - restorecon -vF /etc/cron.d/roxagent
+                - systemctl restart crond
                 - systemctl enable --now httpd
-                - echo '<h1>rhel-webserver</h1><p>ACS VM scanning demo</p>' > /var/www/html/index.html
+                - echo 'rhel-webserver - ACS VM scanning demo' > /var/www/html/index.html
+                - /usr/local/bin/roxagent --daemon
                 - echo "Setup complete"
   dataVolumeTemplates:
-  - metadata:
-      name: rhel-webserver-volume
-    spec:
-      sourceRef:
-        kind: DataSource
-        name: rhel10
-        namespace: openshift-virtualization-os-images
-      storage:
-        resources:
-          requests:
-            storage: 30Gi
-EOF
+    - apiVersion: cdi.kubevirt.io/v1beta1
+      kind: DataVolume
+      metadata:
+        name: rhel-webserver
+      spec:
+        sourceRef:
+          kind: DataSource
+          name: rhel9
+          namespace: openshift-virtualization-os-images
+        storage:
+          resources:
+            requests:
+              storage: 30Gi
 ----
-
++
 . Wait until the VirtualMachineInstance is running:
 +
 [source,sh,subs="attributes",role=execute]
@@ -334,22 +356,22 @@ TIP: First boot can take several minutes while cloud-init registers the system, 
 
 . Confirm the DataVolume completed and note the guest IP:
 +
-The disk volume is named `rhel-webserver-volume` (from `dataVolumeTemplates`); the VMI is named `rhel-webserver`.
+The DataVolume and VMI are both named `rhel-webserver`.
 +
-[source,sh,subs="attributes",role=execute]
+[source,sh,role=execute]
 ----
-oc get dv rhel-webserver-volume -n acs-virt
+oc get dv rhel-webserver -n acs-virt
 oc get vmi rhel-webserver -n acs-virt
 ----
 +
 When the VMI is `Running`, get the guest IP:
 +
-[source,sh,subs="attributes",role=execute]
+[source,sh,role=execute]
 ----
 oc get vmi rhel-webserver -n acs-virt -o jsonpath='{.status.interfaces[0].ipAddress}{"\n"}'
 ----
 +
-NOTE: If the VMI stays in `Scheduling` or `Pending`, wait for the DataVolume `PHASE` to reach `Succeeded`. That clone from the `rhel10` DataSource can take a few minutes.
+NOTE: If the VMI stays in `Scheduling` or `Pending`, wait for the DataVolume `PHASE` to reach `Succeeded`. That clone from the `rhel9` DataSource can take a few minutes.
 
 . Access the guest web server from the Showroom terminal using the VMI IP:
 +
@@ -361,7 +383,7 @@ curl -I "http://${VM_IP}/"
 curl "http://${VM_IP}/"
 ----
 +
-You should see an HTTP `200` response and a short HTML page that identifies `rhel-webserver`.
+You should see an HTTP `200` response and page content that identifies `rhel-webserver`.
 +
 If `curl` fails, open the guest console (*Virtualization > VirtualMachines > rhel-webserver > Console*) and log in to check cloud-init and `httpd`:
 +
@@ -386,7 +408,7 @@ systemctl status httpd --no-pager
 curl -I http://127.0.0.1/
 ----
 
-. Optionally verify `roxagent` inside the guest (installed by `init-vm.sh` on a cron schedule):
+. Optionally verify `roxagent` inside the guest (installed by cloud-init on a cron schedule):
 +
 [source,bash,role="copypaste"]
 ----
