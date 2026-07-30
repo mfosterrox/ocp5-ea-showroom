@@ -1,7 +1,7 @@
 ---
 site:
   title: OpenShift 5 Early Access
-  url: github.com/rhpds/ocp5-ea-showroom
+  url: https://github.com/rhpds/ocp5-ea-showroom
   start_page: modules::index.adoc
 
 content:
