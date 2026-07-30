@@ -6,42 +6,630 @@ include::partial$_attributes.adoc[]
 
 Red Hat Advanced Cluster Security (ACS) 5 introduces several new capabilities for securing containerized and virtualized workloads:
 
-* *VM Vulnerability Management* — extends RHACS vulnerability scanning to cover virtual machine workloads running on OpenShift Virtualization. The `roxagent` binary runs inside VMs, scans installed packages (RPM/DNF), and reports vulnerabilities to ACS Central via the collector relay over VSOCK. Organizations gain unified vulnerability visibility across both containers and VMs from a single ACS console.
+. *VM Vulnerability Management* — extends RHACS vulnerability scanning to cover virtual machine workloads running on OpenShift Virtualization. The `roxagent` binary runs inside VMs, scans installed packages (RPM/DNF), and reports vulnerabilities to ACS Central via the collector relay over VSOCK. Organizations gain unified vulnerability visibility across both containers and VMs from a single ACS console.
 
-* *File Activity Monitoring (FAM)* — provides runtime file integrity monitoring. Security teams can define custom file paths (with wildcard support) to monitor for access, modification, and rename operations. File activity criteria can be combined with process-level criteria (process name, ancestor, arguments, UID) in deployment and node policies, enabling detection of unauthorized file access patterns required for compliance frameworks such as PCI-DSS.
+. *File Activity Monitoring (FAM)* — provides runtime file integrity monitoring. Security teams can define custom file paths (with wildcard support) to monitor for access, modification, and rename operations. File activity criteria can be combined with process-level criteria (process name, ancestor, arguments, UID) in deployment and node policies, enabling detection of unauthorized file access patterns required for compliance frameworks such as PCI-DSS.
 
-* *Init Container Security Coverage* — RHACS now evaluates init containers for both image scanning and security policies. When a deployment references init containers, their images are scanned for vulnerabilities using the same process as main container images. Build and Deploy stage policies can be configured to include or exclude init containers using the "Filters" menu.
+. *Init Container Security Coverage* — RHACS now evaluates init containers for both image scanning and security policies. When a deployment references init containers, their images are scanned for vulnerabilities using the same process as main container images. Build and Deploy stage policies can be configured to include or exclude init containers using the "Filters" menu.
 
-* *ACS MCP Server* — exposes ACS Vulnerability Management and Configuration Management APIs as MCP tools, allowing AI agents to interact programmatically with security data.
+. *ACS MCP Server* — exposes ACS Vulnerability Management and Configuration Management APIs as MCP tools, allowing AI agents to interact programmatically with security data.
 
+Each of these features is covered in more detail in the following sections. Part of each walkthrough will be to discuss how the feature is setup, how it works, and how it can be used to secure your environment.
 
-== Before You Begin
+*The ACS team asks that you provide feedback on the feature by completing the structured feedback form at the end of each exercise.*
 
-* Log in to ACS Central: https://central-acs.{openshift_cluster_ingress_domain}[ACS Central^] (admin / `{common_password}`)
-* Verify the Secured Cluster is connected: navigate to *Platform Configuration > Clusters* in ACS Central
-* Verify the VM is running: `oc get vmi -n acs-virt`
-* Check roxagent status on the VM:
-** Connect via the OpenShift console: *Virtualization > VirtualMachines > rhel9-vm > Console*
-** Log in with `{vm_user}` / `{vm_password}`
-** Run: `systemctl status roxagent.service` and `journalctl -u roxagent.service --no-pager -n 20`
+== Environment checks to make sure you're ready to go
+
+* Confirm you can open the OpenShift console and ACS Central tabs in the Showroom UI
+
+* Log in to ACS Central (admin / `{common_password}`):
++
+[source,text,role="copypaste",subs="+attributes"]
+----
+https://central-acs.{openshift_cluster_ingress_domain}
+----
+
+* Verify the Secured Cluster is connected: navigate to *Platform Configuration > Clusters* in ACS Central and confirm the Secured Cluster is listed.
+
+* Verify the prebuilt VM is running:
++
+[source,sh,subs="attributes",role=execute]
+----
+oc get vmi -n acs-virt
+----
++
+You should see `rhel9-vm` in a `Running` phase.
+
+* Deploy the RHACS / OpenShift Security Roadshow demo applications (intentionally vulnerable workloads for ACS testing) from https://github.com/mfosterrox/demo-applications[demo-applications^]:
++
+[source,sh,subs="attributes",role=execute]
+----
+git clone https://github.com/mfosterrox/demo-applications.git
+cd demo-applications
+oc apply -f k8s-deployment-manifests/-namespaces/
+oc apply -R -f k8s-deployment-manifests/juice-shop/
+oc apply -R -f k8s-deployment-manifests/log4shell/
+oc apply -R -f k8s-deployment-manifests/webgoat/
+oc apply -R -f k8s-deployment-manifests/dvwa/
+oc apply -R -f k8s-deployment-manifests/medical-application/
+oc apply -R -f k8s-deployment-manifests/emojivoto/
+----
++
+
+* Verify the ACS MCP server is available:
++
+[source,sh,subs="attributes",role=execute]
+----
+oc get pods -n acs-mcp
+oc get route -n acs-mcp
+----
++
+Output should look like this:
++
+[source,bash]
+----
+oc get route -n acs-mcp
+NAME                                          READY   STATUS      RESTARTS   AGE
+acs-mcp-server-stackrox-mcp-b79597899-lz64s   1/1     Running     0          3h5m
+copy-central-ca-8jrsn                         0/1     Completed   0          178m
+NAME                          HOST/PORT                                                                    PATH   SERVICES                      PORT    TERMINATION          WILDCARD
+acs-mcp-server-stackrox-mcp   acs-mcp-server-stackrox-mcp-acs-mcp.apps.ocp.2bfz7.sandbox5240.opentlc.com          acs-mcp-server-stackrox-mcp   https   reencrypt/Redirect   None
+----
++
 
 == Hands-on Exercises
 
-_Content coming soon._
+=== Exercise 1: VM Vulnerability Management
+
+In this exercise you will walk through the ACS 5 vulnerability scanning capabilities for OpenShift Virtualization workloads.
+
+==== Understanding the prerequisites for VM vulnerability scanning
+
+Before you verify the prebuilt VM, review what RHACS requires to scan OpenShift Virtualization workloads. These conditions are already met in this lab for `rhel9-vm`.
+
+For full product details, see the link:https://docs.redhat.com/en/documentation/red_hat_advanced_cluster_security_for_kubernetes/4.10/html-single/operating/index#scanning-virtual-machines_examine-images-for-vulnerabilities[Scanning virtual machines^] topic in the RHACS 4.10 Operating guide.
+
+.How RHACS scans virtual machines
+
+RHACS collects, processes, and analyzes VM package data with these components:
+
+`roxagent`::
+Binary that runs inside the VM. It scans installed packages, creates index reports, and sends them to the relay.
+
+Relay::
+Node-level Collector component that receives index reports over VSOCK and forwards them to Sensor.
+
+Sensor::
+Cluster-level component that aggregates VM data with Kubernetes API information and sends it to Central.
+
+Central::
+Stores VM information, matches packages against known CVEs (via Scanner V4), and exposes results in the RHACS portal and API.
+
+.Prerequisites
+
+OpenShift Virtualization and RHACS must meet the following requirements:
+
+* The OpenShift Virtualization Operator is installed on the cluster you want to scan.
+* The `HyperConverged` resource is patched to enable virtual socket (vsock) support.
+* The RHACS feature flag `ROX_VIRTUAL_MACHINES=true` is set on the Central container, the Sensor container, and the Compliance container in the Collector pod.
+
+Each VM to be scanned must meet the following requirements:
+
+* The VM runs Red Hat Enterprise Linux (RHEL) and is registered with Red Hat Subscription Manager with an active RHEL subscription.
+* VSOCK is enabled on the VM with `spec.domain.devices.autoattachVSOCK: true`.
+* The VM has internet access to download repository-to-Common Platform Enumeration (CPE) mappings.
+* DNF is installed.
+* `roxagent` runs with privileges sufficient to scan package databases and send index reports over a privileged port (typically root or sudo).
+
+NOTE: In the next part of this exercise you create a second VM and apply the same techniques covered here.
+
+==== Verifying and reviewing the prebuilt VM in ACS
+
+.Procedure
+. Confirm the prebuilt VM instance is running:
++
+[source,sh,subs="attributes",role=execute]
+----
+oc get vmi -n acs-virt
+----
++
+Output:
+[source,bash]
+----
+oc get vmi -n acs-virt
+NAME       AGE     PHASE     IP            NODENAME
+rhel9-vm   10m     Running   10.129.2.10   ip-10-0-161-177.ec2.internal
+----
++
+You should see `rhel9-vm` in a `Running` phase. You can also confirm in the OpenShift console under *Virtualization > VirtualMachines*.
+
+. In the OpenShift console, go to *Virtualization > VirtualMachines* and select the `acs-virt` project.
++
+Confirm that `rhel9-vm` is listed and shows a *Running* status.
++
+image::acs-vm-openshift-virtualmachines.png[OpenShift console VirtualMachines page showing rhel9-vm Running in the acs-virt project,link=_images/acs-vm-openshift-virtualmachines.png,window=_blank]
+
+. Open the web console for `rhel9-vm` and log in:
++
+On the `rhel9-vm` overview, use *Open web console* (or open the *Console* tab).
++
+Log in with the following credentials:
++
+Username:
++
+[source,text,role="copypaste",subs="+attributes"]
+----
+{vm_user}
+----
++
+Password:
++
+[source,text,role="copypaste",subs="+attributes"]
+----
+{vm_password}
+----
++
+Run the remaining guest commands in this procedure from the VM console, not from the Showroom terminal.
+
+. Verify that `roxagent` is installed and healthy inside the VM:
++
+[source,sh,subs="attributes",role=execute]
+----
+systemctl status roxagent.service
+----
++
+[source,sh,subs="attributes",role=execute]
+----
+journalctl -u roxagent.service --no-pager -n 20
+----
++
+NOTE: The service should be active (or recently successful via the systemd timer). The journal should show scan activity without persistent connection errors to the collector relay over VSOCK.
+
+. In ACS Central, open *Vulnerability Management > Results > Virtual Machines*.
++
+You should see the `rhel9-vm` workload listed for the `acs-virt` namespace, including CVE counts by severity.
++
+image::acs-vm-vulnerabilities-list.png[ACS Virtual machine vulnerabilities page listing rhel9-vm with CVE severity counts,link=_images/acs-vm-vulnerabilities-list.png,window=_blank]
+
+. Click `rhel9-vm` and review the reported CVEs and related details.
++
+Use the *Vulnerabilities*, *Components*, and *Details* tabs to explore findings for the guest OS.
++
+image::acs-vm-rhel9-cve-details.png[ACS vulnerability details for rhel9-vm showing CVE severity summary and CVE table,link=_images/acs-vm-rhel9-cve-details.png,window=_blank]
+
+==== Create and onboard a second VM (Optional)
+
+In this optional path you deploy a second VirtualMachine from a declarative GitOps-style manifest, focus on the fields that matter for ACS vulnerability scanning, apply the YAML, then reach the guest web server.
+
+IMPORTANT: Schedule the VM on a *worker* node. The ACS collector relay is not enabled on control-plane nodes by default.
+
+. Review the VirtualMachine manifest sections that matter for ACS vulnerability scanning:
++
+* *VSOCK* — `spec.template.spec.domain.devices.autoattachVSOCK: true` so `roxagent` can send index reports to the collector relay.
+* *RHEL guest with subscription and DNF* — ACS VM scanning supports RHEL packages indexed by DNF with valid repository links. Cloud-init registers the guest and enables RHEL repos so scans can map packages to CVEs.
+* *`roxagent` in the guest* — cloud-init installs `roxagent` and schedules it via cron to report package inventory to ACS.
++
+[source,yaml]
+----
+devices:
+  autoattachVSOCK: true
+----
+
+. Review and apply the VirtualMachine manifest.
++
+This YAML enables VSOCK, clones the cluster `rhel9` DataSource, registers the guest with Subscription Manager, installs demo packages, and runs `roxagent` on a cron schedule so ACS can report VM vulnerabilities:
++
+[source,yaml,subs="+attributes,macros+"]
+----
+include::https://raw.githubusercontent.com/rhpds/ocp5-ea-showroom/main/content/modules/ROOT/examples/rhel-webserver-vm.yaml[]
+----
++
+. Wait until the VirtualMachineInstance is running:
++
+[source,sh,subs="attributes",role=execute]
+----
+oc wait --for=jsonpath='{.status.phase}'=Running vmi/rhel-webserver -n acs-virt --timeout=600s
+----
++
+Confirm the VMI status:
++
+[source,sh,subs="attributes",role=execute]
+----
+oc get vmi rhel-webserver -n acs-virt
+----
++
+TIP: First boot can take several minutes while cloud-init registers the system, enables repos, installs packages, and starts `httpd`.
+
+. Confirm the DataVolume completed and note the guest IP:
++
+The DataVolume and VMI are both named `rhel-webserver`.
++
+[source,sh,role=execute]
+----
+oc get dv rhel-webserver -n acs-virt
+oc get vmi rhel-webserver -n acs-virt
+----
++
+When the VMI is `Running`, get the guest IP:
++
+[source,sh,role=execute]
+----
+oc get vmi rhel-webserver -n acs-virt -o jsonpath='{.status.interfaces[0].ipAddress}{"\n"}'
+----
++
+NOTE: If the VMI stays in `Scheduling` or `Pending`, wait for the DataVolume `PHASE` to reach `Succeeded`. That clone from the `rhel9` DataSource can take a few minutes.
+
+. Access the guest web server from the Showroom terminal using the VMI IP:
++
+[source,sh,subs="attributes",role=execute]
+----
+VM_IP=$(oc get vmi rhel-webserver -n acs-virt -o jsonpath='{.status.interfaces[0].ipAddress}')
+echo "VM IP: ${VM_IP}"
+curl -I "http://${VM_IP}/"
+curl "http://${VM_IP}/"
+----
++
+You should see an HTTP `200` response and page content that identifies `rhel-webserver`.
++
+If `curl` fails, open the guest console (*Virtualization > VirtualMachines > rhel-webserver > Console*) and log in to check cloud-init and `httpd`:
++
+Username:
++
+[source,text,role="copypaste"]
+----
+cloud-user
+----
++
+Password:
++
+[source,text,role="copypaste"]
+----
+redhat
+----
++
+[source,bash,role="copypaste"]
+----
+sudo cloud-init status --long
+systemctl status httpd --no-pager
+curl -I http://127.0.0.1/
+----
+
+. Optionally verify `roxagent` inside the guest (installed by cloud-init on a cron schedule):
++
+[source,bash,role="copypaste"]
+----
+command -v roxagent
+sudo /usr/local/bin/roxagent --daemon
+sudo journalctl -t roxagent --no-pager -n 20 2>/dev/null || sudo tail -n 20 /var/log/messages
+----
+
+. Return to ACS Central → *Vulnerability Management > Results > Virtual Machines* and confirm `rhel-webserver` appears alongside `rhel9-vm`.
++
+Allow several minutes after the first successful `roxagent` run for results to show.
+
+==== Structured feedback (VM Vulnerability Management)
+
+After completing Part A (and Part B if you ran it), capture feedback for the product team:
+
+* Did the prebuilt `rhel9-vm` results appear in ACS without additional ACS UI configuration?
+* If you created `rhel-webserver`: roughly how many minutes from apply → first visible result in ACS?
+* Was the `roxagent` install and VSOCK requirement clear enough to operationalize?
+* Compared with any existing VM scanners you use, what gaps remain (coverage, UX, day-2 ops)?
+* Would unified container + VM visibility in ACS replace a separate VM scanning tool in your organization?
+
+=== Exercise 2: File Activity Monitoring (FAM)
+
+In this exercise you will walk through ACS File Activity Monitoring: how it is enabled, which policies this lab already deploys, how to trigger a deployment-scoped violation, and how to confirm it in the Violations UI.
+
+==== Understanding the prerequisites for File Activity Monitoring
+
+Before you trigger a violation, review what RHACS requires for file activity monitoring. These conditions are already met in this lab.
+
+For full product details, see the link:https://docs.redhat.com/en/documentation/red_hat_advanced_cluster_security_for_kubernetes/4.10/html-single/operating/index#configuring-file-activity-monitoring_using-policies-to-provide-security[Configuring file activity monitoring^] topic in the RHACS 4.10 Operating guide.
+
+IMPORTANT: File activity monitoring is a Technology Preview feature.
+
+.How RHACS monitors file activity
+
+Collector (per node)::
+Observes file operations on monitored paths for containerized workloads and for host processes, then forwards events to Sensor.
+
+Sensor::
+Evaluates runtime policies against those events and reports matches to Central.
+
+Central::
+Stores violations and exposes them in the portal (deployment events) and API (including node events).
+
+.Prerequisites
+
+RHACS and the secured cluster must meet the following requirements:
+
+* File Activity Monitoring is enabled on the SecuredCluster under `spec.perNode.fileActivityMonitoring.mode: Enabled`.
+* Runtime policies use the *File Path* criterion (RHACS 4.11+ field) with either a *Deployment* or *Node* event source.
+* The architecture is x86 (the only architecture supported for FAM in this preview).
+
+NOTE: Node-event violations do *not* appear on the Violations page in the RHACS portal today. Use notifiers or the `/v1/alerts` API for node FAM. Machine Config Operator file changes are not detected.
+
+==== Review the preconfigured FAM policies
+
+This environment already enables FAM on the SecuredCluster and deploys two SecurityPolicy resources via GitOps (same pattern as the RHACS demo FAM setup):
+
+* *Deployment File Activity* — `eventSource: DEPLOYMENT_EVENT`, monitors sensitive paths such as `/etc/**/*`, `/boot/**/*`, and `/usr/**/*` for container/workload file activity.
+* *Node File Activity* — `eventSource: NODE_EVENT`, monitors the same path patterns for host-level processes (SSH, systemd, and similar).
+
+. Confirm FAM is enabled on the SecuredCluster:
++
+[source,sh,subs="attributes",role=execute]
+----
+oc get securedcluster -n acs -o jsonpath='{.items[0].metadata.name}{"\n"}{.items[0].spec.perNode.fileActivityMonitoring.mode}{"\n"}'
+----
++
+You should see the SecuredCluster name and `Enabled`.
+
+. In ACS Central, open *Platform Configuration > Policy Management*.
++
+Search for `File Activity` and open *Deployment File Activity*.
++
+Confirm:
+
+* *Lifecycle* is *Runtime*
+* *Event source* is *Deployment*
+* Policy criteria include *File Path* values such as `/etc/**/*`
+
+. Open *Node File Activity* and confirm the event source is *Node* with the same style of *File Path* criteria.
++
+TIP: The GitOps source for these policies is in the lab GitOps repository under `acs/acs-instance/templates/fim-deployment-policy.yaml` and `fim-node-policy.yaml`.
+
+. Verify the payments demo workload used for the deploy trigger is running:
++
+[source,sh,subs="attributes",role=execute]
+----
+oc get deploy visa-processor -n payments
+oc get pods -n payments -l app=visa-processor -o wide
+----
++
+NOTE: Use the privileged `visa-processor-sidecar` container for the trigger. The `mastercard-processor` container runs non-root and cannot modify `/etc/passwd`.
+
+==== Trigger and review a deployment FAM violation
+
+. Trigger a monitored file operation inside the privileged sidecar:
++
+[source,sh,subs="attributes",role=execute]
+----
+oc exec -n payments deployment/visa-processor -c visa-processor-sidecar -- touch /etc/passwd
+----
++
+This matches the *Deployment File Activity* policy (`/etc/**/*` under a deployment event source), following the same trigger pattern used in the RHACS demo FAM setup.
+
+. In ACS Central, open *Violations*.
++
+Filter by policy name `Deployment File Activity` (or search for `File Activity`).
++
+Open a matching violation and review the runtime detail (file path, process context, deployment, and timestamp).
+
+. Optionally confirm the alert count via the ACS API (basic auth):
++
+[source,bash,role="execute",subs="+attributes"]
+----
+CENTRAL="https://central-acs.{openshift_cluster_ingress_domain}"
+curl -sk -u "admin:{common_password}" -G "${CENTRAL}/v1/alerts/summary/groups" \
+  --data-urlencode 'query=Policy:"Deployment File Activity"' | jq .
+----
++
+You should see `numAlerts` greater than zero for that policy.
+
+What you just proved:: FAM on the secured cluster observed a container file operation on a monitored path, Sensor evaluated the *Deployment File Activity* runtime policy, and Central recorded a Violations-page alert.
+
+==== Trigger a node FAM violation
+
+Use this path if you want to exercise host-level file activity. Node FAM alerts are visible through the API (and notifiers), not the Violations UI.
+
+. Trigger a host file operation via `nsenter` into PID 1 on a worker node:
++
+[source,sh,subs="attributes",role=execute]
+----
+NODE=$(oc get nodes -l node-role.kubernetes.io/worker -o jsonpath='{.items[0].metadata.name}')
+echo "Using node: ${NODE}"
+oc debug "node/${NODE}" --quiet -- bash -c 'nsenter -t 1 -m -u -i -n -p touch /etc/passwd'
+----
++
+IMPORTANT: Plain `oc debug node` shells are classified as *deployment* events. The `nsenter` into PID 1 is required so RHACS records a *NODE_EVENT*.
+
+. Query node FAM alerts via the API:
++
+[source,bash,role="execute",subs="+attributes"]
+----
+CENTRAL="https://central-acs.{openshift_cluster_ingress_domain}"
+curl -sk -u "admin:{common_password}" -G "${CENTRAL}/v1/alerts/summary/groups" \
+  --data-urlencode 'query=Policy:"Node File Activity"' | jq .
+----
++
+NOTE: Do not expect these alerts on the *Violations* page; that limitation is part of the Technology Preview.
+
+==== Structured feedback (File Activity Monitoring)
+
+After completing the deployment trigger (and the optional node trigger if you ran it), capture feedback for the product team:
+
+* Was File Activity Monitoring already enabled and understandable from the SecuredCluster / policy configuration?
+* Did the *Deployment File Activity* violation appear in the Violations UI after `touch /etc/passwd`? Roughly how long did it take?
+* Are the monitored path patterns (`/etc/**/*`, `/usr/**/*`, and similar) useful for your environment, or too broad/noisy?
+* If you ran the node trigger: was API-only visibility for node events acceptable for operations?
+* Would you combine File Path criteria with process criteria (process name, ancestor, UID) for production policies?
+
+=== Exercise 3: Init Container Security Coverage
+
+In this exercise, you will confirm that ACS scans init container images and that Build/Deploy policies can include or exclude them.
+
+. _Step placeholder_
++
+NOTE: Replace with guided steps (for example, deploy a workload with an init container, review scan results, then adjust policy Filters).
+
+=== Exercise 4: ACS MCP Server
+
+In this exercise you will walk through the ACS (StackRox) MCP server: how it exposes RHACS APIs as MCP tools, verify the preinstalled endpoint, query security data through OpenShift Lightspeed (and optionally an external MCP client), and capture feedback.
+
+==== Understanding the ACS MCP server
+
+The ACS MCP server is based on https://github.com/stackrox/stackrox-mcp[stackrox-mcp^] (same approach as the RHACS demo `mcp-server-setup`). It exposes RHACS Central data to MCP-compatible clients through toolsets such as:
+
+* *Vulnerability management* — query CVEs, images, deployments, and related findings
+* *Configuration management* — read RHACS configuration such as clusters and policies (read-only in this lab)
+
+.How it fits together
+
+ACS MCP server::
+Runs in the `acs-mcp` namespace, speaks streamable HTTP MCP on `/mcp`, and calls Central on behalf of the client.
+
+Authentication::
+External clients use *passthrough* auth: your MCP client sends `Authorization: Bearer <ACS API token>`. OpenShift Lightspeed is pre-wired with an Analyst token via secret `acs-mcp-api-token`.
+
+AI client::
+OpenShift Lightspeed (in-console) or an external MCP client (Claude Code, Cursor, Claude Desktop) discovers tools and answers natural-language security questions.
+
+.Prerequisites
+
+* The ACS MCP server Deployment and Route are available in `acs-mcp` (preinstalled via GitOps).
+* Central is reachable and the secured cluster is reporting data (completed in the environment checks).
+* For Lightspeed: OLSConfig includes the `MCPServer` feature gate and an `acs-mcp` server entry (already configured in this lab).
+* For an external client: an ACS API token with at least the *Analyst* role.
+
+==== Verify the preinstalled ACS MCP server
+
+. Confirm the MCP pod and Route:
++
+[source,sh,subs="attributes",role=execute]
+----
+oc get pods -n acs-mcp
+oc get route -n acs-mcp
+----
+
+. Check the health endpoint:
++
+[source,sh,subs="attributes",role=execute]
+----
+MCP_HOST=$(oc get route -n acs-mcp -o jsonpath='{.items[0].spec.host}')
+echo "MCP endpoint: https://${MCP_HOST}/mcp"
+curl -sk "https://${MCP_HOST}/health"
+----
++
+You should see `{"status":"ok"}`.
++
+TIP: Keep the printed MCP endpoint URL — you will need it if you connect an external client.
+
+. Confirm Lightspeed is wired to ACS MCP:
++
+[source,sh,subs="attributes",role=execute]
+----
+oc get olsconfig cluster -n openshift-lightspeed -o jsonpath='{range .spec.mcpServers[*]}{.name}{" -> "}{.url}{"\n"}{end}'
+oc get secret acs-mcp-api-token -n openshift-lightspeed
+----
++
+You should see an `acs-mcp` entry pointing at the in-cluster ACS MCP service URL, and the API token secret present.
+
+==== Query ACS through OpenShift Lightspeed
+
+. Open the OpenShift console and launch *OpenShift Lightspeed* (chat icon).
++
+If prompted to approve MCP tools, approve the ACS MCP tools so the agent can call them.
+
+. Ask Lightspeed to list secured clusters (warm-up, from the stackrox-mcp / RHACS demo examples):
++
+----
+List all clusters secured by ACS / StackRox.
+----
+
+. Ask a vulnerability question that exercises the vulnerability toolset:
++
+----
+Is CVE-2021-44228 (Log4Shell) detected in any of my clusters or deployments?
+----
++
+TIP: This lab deploys intentionally vulnerable demo apps (including log4shell). Compare the agent answer with *Vulnerability Management* in ACS Central.
+
+. Ask a configuration-oriented question:
++
+----
+Using the ACS MCP tools, summarize the secured clusters and list a few runtime policies related to file activity or anomalous activity.
+----
+
+. Optionally try more targeted prompts:
++
+----
+Show deployments affected by critical CVEs in the juice-shop or log4shell namespaces.
+----
++
+----
+Use the ACS MCP server and run list_clusters.
+----
+
+What you just proved:: The ACS MCP server translated natural-language questions into RHACS API tool calls (vulnerability and configuration), and Lightspeed returned security data without you running `roxctl` or clicking through every Central page manually.
+
+==== Connect an external MCP client (Optional)
+
+Use this path if you want to connect Claude Code, Cursor, or Claude Desktop the way the RHACS demo documents.
+
+. Generate an Analyst API token in Central:
++
+[source,bash,role="execute",subs="+attributes"]
+----
+CENTRAL="https://central-acs.{openshift_cluster_ingress_domain}"
+curl -sk -u "admin:{common_password}" \
+  -X POST "${CENTRAL}/v1/apitokens/generate" \
+  -H "Content-Type: application/json" \
+  -d '{"name":"acs-mcp-lab","roles":["Analyst"]}' | jq -r .token
+----
++
+Copy the token value. You can also create a token in ACS Central under *Platform Configuration > Integrations > API Token*.
+
+. Note the public MCP endpoint:
++
+[source,sh,subs="attributes",role=execute]
+----
+echo "https://$(oc get route -n acs-mcp -o jsonpath='{.items[0].spec.host}')/mcp"
+----
+
+. Configure *Claude Code*:
++
+[source,bash,role="copypaste"]
+----
+claude mcp add --transport http acs \
+  https://<acs-mcp-route-host>/mcp \
+  --header "Authorization: Bearer <paste-your-token-here>"
+----
+
+. Or add this to Claude Desktop / Cursor MCP settings:
++
+[source,json,role="copypaste"]
+----
+{
+  "mcpServers": {
+    "acs": {
+      "url": "https://<acs-mcp-route-host>/mcp",
+      "headers": {
+        "Authorization": "Bearer <paste-your-token-here>"
+      }
+    }
+  }
+}
+----
++
+Replace `<acs-mcp-route-host>` and `<paste-your-token-here>` with the values from the previous steps.
+
+. In your external client, run the same prompts as in the Lightspeed section (list clusters, Log4Shell CVE, file-activity policies) and confirm tools are invoked successfully.
+
+==== Structured feedback (ACS MCP Server)
+
+After completing the Lightspeed queries (and the optional external client path if you used it), capture feedback for the product team:
+
+* Did ACS MCP connect cleanly through Lightspeed without extra token setup?
+* Were vulnerability answers accurate compared with the ACS Central UI?
+* Which tool categories were most useful (vulnerability vs configuration)?
+* If you used an external client: was passthrough Bearer auth clear enough to operationalize?
+* Would ACS MCP replace or complement existing `roxctl` / API / UI workflows for your team?
 
 == Other Things to Try
 
-* Navigate to *Vulnerability Management > Results > Virtual Machines* in ACS Central to view VM scan results
-* Check file activity monitoring events in the ACS portal
-* Connect to the ACS MCP server from an MCP client and query policies, violations, and image data
-* Trigger a roxagent scan manually on the VM: `sudo systemctl start roxagent.service`
-* Review the SecuredCluster CR to see FAM and initContainer scanning configuration
-
-== Known Limitations
-
-* The collector relay (which receives reports from roxagent via VSOCK) does not start on control-plane nodes unless `ROX_VIRTUAL_MACHINES_RELAY_ENABLED_ON_MASTER_NODES` is explicitly set — VMs should be scheduled on worker nodes
-* roxagent retries on failure via `Restart=on-failure` with a 60-second retry interval; the systemd timer also retries periodically
-* VM scanning is a Technology Preview feature
+* TBD
 
 == Key Takeaways
 
