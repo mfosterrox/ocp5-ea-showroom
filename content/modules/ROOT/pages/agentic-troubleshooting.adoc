@@ -29,7 +29,7 @@ These issues are designed to leave a causal trail — cascading failures with an
 
 . Verify the troubleshooting applications are deployed. You should expect to see a mix of `Running`, `Completed`, and `ImagePullBackOff` statuses — this is intentional, as these broken states are what the agentic system will investigate:
 +
-[source,bash,role="copypaste"]
+[source,sh,role=execute]
 ----
 oc get pods -n payments && \
 oc get pods -n catalog-service && \
@@ -159,7 +159,7 @@ By default, the agentic alerts adapter runs in the cluster but does not process 
 
 . Enable the alerts adapter to process critical alerts, then restart the adapter pod to pick up the change:
 +
-[source,bash,role="copypaste"]
+[source,sh,role=execute]
 ----
 oc get configmap alerts-adapter-config -n openshift-lightspeed -o json \
   | jq '.data["config.yaml"] |= gsub("# +- critical"; "    - critical")' \

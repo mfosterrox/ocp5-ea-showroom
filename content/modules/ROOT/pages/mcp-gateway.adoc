@@ -42,14 +42,14 @@ All commands in this section should be run in the *terminal on the right side* o
 
 . Install the FastMCP CLI tool:
 +
-[source,bash,role="copypaste"]
+[source,sh,role=execute]
 ----
 sudo dnf install -y pip && pip3 install fastmcp
 ----
 
 . Set up environment variables and persist them to `~/.bashrc` (in case your terminal session disconnects):
 +
-[source,bash,role="copypaste",subs="+attributes"]
+[source,sh,role=execute,subs="+attributes"]
 ----
 export SSO_URL="https://sso.{openshift_cluster_ingress_domain}"
 export SERVER=http://mcp.{openshift_cluster_ingress_domain}/mcp
@@ -77,7 +77,7 @@ NOTE: If your terminal disconnects, the environment variables will be restored a
 
 . Verify the MCP Gateway and mock servers are running:
 +
-[source,bash,role="copypaste"]
+[source,sh,role=execute]
 ----
 oc get pods -n mock-mcp-servers && \
 oc get mcpserverregistrations -n mock-mcp-servers
@@ -93,7 +93,7 @@ In this exercise, you will connect to the federated MCP Gateway endpoint and ver
 
 . Verify the gateway rejects unauthenticated requests:
 +
-[source,bash,role="copypaste"]
+[source,sh,role=execute]
 ----
 fastmcp list $SERVER --auth none
 ----
@@ -102,7 +102,7 @@ You should see a connection error — the gateway returns `401 Unauthorized` wit
 
 . Now connect with your token:
 +
-[source,bash,role="copypaste"]
+[source,sh,role=execute]
 ----
 fastmcp list $SERVER --auth $USER1_TOKEN
 ----
@@ -117,7 +117,7 @@ The gateway federates tools from all registered MCP servers, applying a prefix t
 
 . List all available tools:
 +
-[source,bash,role="copypaste"]
+[source,sh,role=execute]
 ----
 fastmcp list $SERVER --auth $USER1_TOKEN
 ----
@@ -126,7 +126,7 @@ Notice the prefixes: `inventory_`, `payments_`, `accounts_` — these map to the
 
 . Call a tool from the inventory server:
 +
-[source,bash,role="copypaste"]
+[source,sh,role=execute]
 ----
 fastmcp call $SERVER inventory_list_products --auth $USER1_TOKEN
 ----
@@ -135,7 +135,7 @@ The gateway routes the call to the inventory mock server and returns product dat
 
 . Try another tool from a different server to verify federation:
 +
-[source,bash,role="copypaste"]
+[source,sh,role=execute]
 ----
 fastmcp call $SERVER accounts_list_accounts --auth $USER1_TOKEN
 ----
@@ -148,7 +148,7 @@ The gateway enforces OAuth 2.0 / OIDC authentication via Keycloak. Unauthenticat
 
 . Verify the OIDC discovery endpoint:
 +
-[source,bash,role="copypaste",subs="+attributes"]
+[source,sh,role=execute,subs="+attributes"]
 ----
 curl -sk ${SSO_URL}/realms/keycloak/.well-known/openid-configuration | jq '{issuer, token_endpoint, jwks_uri}'
 ----
@@ -157,7 +157,7 @@ The gateway uses this endpoint to validate JWT tokens without manual JWKS config
 
 . Verify that requests without a token are rejected:
 +
-[source,bash,role="copypaste"]
+[source,sh,role=execute]
 ----
 fastmcp list $SERVER --auth none
 ----
@@ -166,7 +166,7 @@ You should see a connection error — the gateway returns `401 Unauthorized`.
 
 . Verify that your token is accepted:
 +
-[source,bash,role="copypaste"]
+[source,sh,role=execute]
 ----
 fastmcp list $SERVER --auth $USER1_TOKEN
 ----
@@ -186,7 +186,7 @@ Access to individual tools is controlled by Keycloak groups and client roles. Ea
 
 . First, verify that user1 can call an inventory tool:
 +
-[source,bash,role="copypaste"]
+[source,sh,role=execute]
 ----
 fastmcp call $SERVER inventory_list_products --auth $USER1_TOKEN
 ----
@@ -195,7 +195,7 @@ This should succeed — user1 has inventory access.
 
 . Now try a payments tool — this should fail:
 +
-[source,bash,role="copypaste"]
+[source,sh,role=execute]
 ----
 fastmcp call $SERVER payments_list_transactions --auth $USER1_TOKEN
 ----
@@ -204,12 +204,12 @@ User1 does not have payments access. You should see an authorization error.
 
 . Using the `user2` token (generated in *Before You Begin*), verify user2 can call payments but not inventory:
 +
-[source,bash,role="copypaste"]
+[source,sh,role=execute]
 ----
 fastmcp call $SERVER payments_list_transactions --auth $USER2_TOKEN
 ----
 +
-[source,bash,role="copypaste"]
+[source,sh,role=execute]
 ----
 fastmcp call $SERVER inventory_list_products --auth $USER2_TOKEN
 ----
@@ -224,7 +224,7 @@ The gateway enforces per-user rate limits based on the JWT `sub` claim. Each use
 
 . First, inspect the RateLimitPolicy that is currently in effect:
 +
-[source,bash,role="copypaste"]
+[source,sh,role=execute]
 ----
 oc get ratelimitpolicy mcp-gateway-ratelimit -n mock-mcp-servers -o json | jq '.spec'
 ----
@@ -233,7 +233,7 @@ Notice the `per-user` limit with `limit: 30` and `window: 1m` — this means eac
 
 . Now send 35 rapid requests as user1 to exceed the limit:
 +
-[source,bash,role="copypaste"]
+[source,sh,role=execute]
 ----
 for i in $(seq 1 50); do
   CODE=$(curl -sk -o /dev/null -w '%{http_code}' --max-time 5 \
@@ -254,7 +254,7 @@ The first 30 requests show green `200 OK`, then requests 31+ show red `429 RATE 
 
 . Inspect the rate limit headers returned on a 429 response:
 +
-[source,bash,role="copypaste"]
+[source,sh,role=execute]
 ----
 curl -svk $SERVER -X POST -H "Content-Type: application/json" \
   -H "Authorization: Bearer $USER1_TOKEN" \
@@ -270,7 +270,7 @@ You should see:
 
 . While user1 is rate-limited, verify that user2 can still make requests:
 +
-[source,bash,role="copypaste"]
+[source,sh,role=execute]
 ----
 fastmcp list $SERVER --auth $USER2_TOKEN
 ----
@@ -279,7 +279,7 @@ Each user has an independent counter.
 
 . Before continuing, increase the rate limit to 200 requests/minute so it doesn't interfere with the remaining exercises:
 +
-[source,bash,role="copypaste"]
+[source,sh,role=execute]
 ----
 oc get ratelimitpolicy mcp-gateway-ratelimit -n mock-mcp-servers -o json \
   | jq '.spec.limits["per-user"].rates[0].limit = 200' \
@@ -292,7 +292,7 @@ MCP Gateway policies can be updated at runtime without restarting the gateway. C
 
 . Check the current rate limit:
 +
-[source,bash,role="copypaste"]
+[source,sh,role=execute]
 ----
 oc get ratelimitpolicy mcp-gateway-ratelimit -n mock-mcp-servers -o json \
   | jq '{limit: .spec.limits["per-user"].rates[0].limit, window: .spec.limits["per-user"].rates[0].window, counter: .spec.limits["per-user"].counters[0].expression}'
@@ -300,7 +300,7 @@ oc get ratelimitpolicy mcp-gateway-ratelimit -n mock-mcp-servers -o json \
 
 . Update the rate limit to 5 requests/minute:
 +
-[source,bash,role="copypaste"]
+[source,sh,role=execute]
 ----
 oc get ratelimitpolicy mcp-gateway-ratelimit -n mock-mcp-servers -o json \
   | jq '.spec.limits["per-user"].rates[0].limit = 5' \
@@ -309,7 +309,7 @@ oc get ratelimitpolicy mcp-gateway-ratelimit -n mock-mcp-servers -o json \
 
 . Wait 15 seconds, then test — you should see 429 after just 5 requests:
 +
-[source,bash,role="copypaste"]
+[source,sh,role=execute]
 ----
 echo "Waiting 15 seconds for policy hot-reload..."
 sleep 15
@@ -331,7 +331,7 @@ done
 
 . Revert the rate limit:
 +
-[source,bash,role="copypaste"]
+[source,sh,role=execute]
 ----
 oc get ratelimitpolicy mcp-gateway-ratelimit -n mock-mcp-servers -o json \
   | jq '.spec.limits["per-user"].rates[0].limit = 30' \
@@ -346,7 +346,7 @@ The MCP Gateway emits OpenTelemetry traces for every request, providing visibili
 
 . Generate some traffic:
 +
-[source,bash,role="copypaste"]
+[source,sh,role=execute]
 ----
 fastmcp call $SERVER inventory_list_products --auth $USER1_TOKEN
 fastmcp call $SERVER accounts_list_accounts --auth $USER1_TOKEN
@@ -382,7 +382,7 @@ When a backend MCP server becomes unavailable, the gateway gracefully removes it
 
 . Verify the current tool count:
 +
-[source,bash,role="copypaste"]
+[source,sh,role=execute]
 ----
 fastmcp list $SERVER --auth $USER1_TOKEN
 ----
@@ -391,14 +391,14 @@ You should see 17 tools.
 
 . Scale down the inventory server:
 +
-[source,bash,role="copypaste"]
+[source,sh,role=execute]
 ----
 oc scale deployment inventory-mcp -n mock-mcp-servers --replicas=0
 ----
 
 . Wait approximately 60 seconds for the gateway to detect the unavailability, then list tools again:
 +
-[source,bash,role="copypaste"]
+[source,sh,role=execute]
 ----
 sleep 60
 fastmcp list $SERVER --auth $USER1_TOKEN
@@ -408,7 +408,7 @@ The 5 `inventory_` tools should be gone, but `payments_` and `accounts_` tools c
 
 . Scale the inventory server back up:
 +
-[source,bash,role="copypaste"]
+[source,sh,role=execute]
 ----
 oc scale deployment inventory-mcp -n mock-mcp-servers --replicas=1
 ----
@@ -423,7 +423,7 @@ MCP-compatible AI clients can connect to the gateway and interact with the mock 
 
 . For *Claude Code* (CLI):
 +
-[source,bash,role="copypaste",subs="+attributes"]
+[source,sh,role=execute,subs="+attributes"]
 ----
 claude mcp add --transport http mcp-gateway \
   http://mcp.{openshift_cluster_ingress_domain}/mcp \

@@ -59,14 +59,18 @@ Your environment is split into two panels:
 
 === Running Commands
 
-Throughout these instructions, you will see command blocks like this:
+Throughout these instructions, you will see command blocks with a small *play button* (▶) in the upper-left corner:
 
-[source,bash,role="copypaste"]
+[source,sh,role=execute]
 ----
 oc get pods -n openshift-lightspeed
 ----
 
-Click the *copy icon* in the top-right corner of any command block to copy it to your clipboard, then paste it into the terminal on the right.
+Click the *play button* to automatically execute the command in the terminal on the right — no copy/paste needed.
+
+image::showroom-execute-button.png[Play button on command blocks,link=_images/showroom-execute-button.png,window=_blank]
+
+Some blocks (such as URLs, JSON configurations, or PromQL queries) show a *copy icon* instead — click it to copy the text to your clipboard for pasting elsewhere.
 
 TIP: You can also type commands directly into the terminal. The terminal supports standard shell features like command history (kbd:[Up] / kbd:[Down] arrows), tab completion (kbd:[Tab]), and kbd:[Ctrl+C] to cancel a running command.
 
