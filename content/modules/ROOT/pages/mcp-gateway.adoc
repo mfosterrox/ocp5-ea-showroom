@@ -231,7 +231,7 @@ oc get ratelimitpolicy mcp-gateway-ratelimit -n mock-mcp-servers -o json | jq '.
 +
 Notice the `per-user` limit with `limit: 30` and `window: 1m` — this means each user is allowed 30 requests per minute. The `counters` field uses `auth.identity.sub` to track each user independently.
 
-. Now send 35 rapid requests as user1 to exceed the limit:
+. Now send 50 rapid requests as user1 to exceed the limit:
 +
 [source,sh,role=execute]
 ----
