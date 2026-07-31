@@ -74,9 +74,16 @@ Some blocks (such as URLs, JSON configurations, or PromQL queries) show a *copy 
 
 TIP: You can also type commands directly into the terminal. The terminal supports standard shell features like command history (kbd:[Up] / kbd:[Down] arrows), tab completion (kbd:[Tab]), and kbd:[Ctrl+C] to cancel a running command.
 
-=== Accessing the OpenShift Console
+=== Accessing Consoles
 
-Open the OpenShift web console in a new browser tab using the link in the Credentials table above. You will use the console for UI-based exercises (viewing alerts, managing virtualization, reviewing ArgoCD applications, etc.).
+Above the terminal on the right side, you will see tabs for different consoles. Clicking a tab opens the corresponding console in a new browser tab:
+
+* *Terminal* — the default view, already logged in to your cluster as `cluster-admin`
+* *OpenShift Console* — the OpenShift web console for UI-based exercises (viewing alerts, managing virtualization, reviewing ArgoCD applications, etc.)
+* *Red Hat Advanced Cluster Security* — the ACS Central console for vulnerability management, policy enforcement, and security monitoring
+* *OpenShift GitOps* — the Argo CD console for viewing application deployments and sync status. Click *Log in via OpenShift* and use the OpenShift credentials from the table above.
+
+Use the credentials from the table above to log in to each console.
 
 === Using Your Own Tools
 
