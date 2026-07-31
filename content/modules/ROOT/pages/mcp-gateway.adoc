@@ -44,7 +44,7 @@ All commands in this section should be run in the *terminal on the right side* o
 +
 [source,sh,role=execute]
 ----
-sudo dnf install -y pip && pip3 install fastmcp
+sudo dnf install -y pip && pip3 install fastmcp==3.4.5
 ----
 
 . Set up environment variables and persist them to `~/.bashrc` (in case your terminal session disconnects):
