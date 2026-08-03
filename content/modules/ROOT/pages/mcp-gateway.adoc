@@ -365,6 +365,8 @@ https://jaeger-mock-mcp-servers.{openshift_cluster_ingress_domain}
 . Select the `mcp-gateway` service, then select `mcp-router.tool-call` from the *Operation* dropdown, and click *Find Traces*. This filters to only the tool call traces (excluding initialize and tools/list requests).
 +
 image::mcp-gateway-jaeger-traces.png[Jaeger traces for MCP Gateway,link=_images/mcp-gateway-jaeger-traces.png,window=_blank]
++
+You may also see the earlier rate-limited failures highlighted in red — this is expected and provides a useful view of how the gateway enforces policy.
 
 . Click on a trace with multiple spans — tool call traces show the full span hierarchy:
 +
