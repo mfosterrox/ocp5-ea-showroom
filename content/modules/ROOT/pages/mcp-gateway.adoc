@@ -40,11 +40,11 @@ Your environment includes:
 
 All commands in this section should be run in the *terminal on the right side* of this window.
 
-. Install the FastMCP CLI tool:
+. Verify the FastMCP CLI is available (it was pre-installed during environment provisioning):
 +
 [source,sh,role=execute]
 ----
-sudo dnf install -y pip && pip3 install fastmcp==3.4.5
+fastmcp version
 ----
 
 . Set up environment variables and persist them to `~/.bashrc` (in case your terminal session disconnects):
