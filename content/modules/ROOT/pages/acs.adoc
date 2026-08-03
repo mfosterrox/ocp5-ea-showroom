@@ -173,12 +173,12 @@ Run the remaining guest commands in this procedure from the VM console, not from
 
 . Verify that `roxagent` is installed and healthy inside the VM:
 +
-[source,sh,subs="attributes",role=execute]
+[source,sh,subs="attributes",role="copypaste"]
 ----
 systemctl status roxagent.service
 ----
 +
-[source,sh,subs="attributes",role=execute]
+[source,sh,subs="attributes",role="copypaste"]
 ----
 journalctl -u roxagent.service --no-pager -n 20
 ----
