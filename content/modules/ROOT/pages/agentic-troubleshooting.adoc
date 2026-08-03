@@ -179,11 +179,11 @@ image::agentic-troubleshooting-agentic-run-detail.png[AgenticRun detail with pro
 
 . Review the proposed remediation steps. Select *Option 1* — rollback to the last known good version (v1.0.1) — and click the *Execute remediation* button to authorize the change. It will ask you once again to confirm the execution. Click *Execute Remediation* once more to confirm.
 
-. Once the remediation and validation is complete, the AgenticRun status will update to *Completed* with a detailed post-execution summary.
+. Once the remediation is executed, review the post-execution summary.
 +
-image::agentic-troubleshooting-execution-complete.png[Completed AgenticRun with execution summary,link=_images/agentic-troubleshooting-execution-complete.png,window=_blank]
+image::agentic-troubleshooting-execution-complete.png[AgenticRun with execution summary,link=_images/agentic-troubleshooting-execution-complete.png,window=_blank]
 +
-NOTE: The screenshot may show the alert still firing and the AgenticRun in an *Escalating* state. This is expected — Prometheus alerts have a built-in evaluation interval and pending period, so it can take several minutes after a successful remediation for the alert to stop firing and the AgenticRun to reach *Completed*.
+NOTE: The screenshot may show the alert still firing and the AgenticRun in an *Escalating* state. This is expected — Prometheus alerts have a built-in evaluation interval and pending period, so it can take several minutes after a successful remediation for the alert to stop firing.
 
 This is the full agentic loop — from alert detection through investigation, proposal, approval, and execution — with a human in the loop at every decision point. The system handles the heavy lifting of data correlation and remediation execution, while the operations team retains full control over what changes are made to the cluster.
 
