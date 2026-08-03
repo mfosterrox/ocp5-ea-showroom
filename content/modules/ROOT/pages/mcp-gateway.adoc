@@ -425,13 +425,13 @@ The gateway provides graceful degradation without any client-side error handling
 
 MCP-compatible AI clients can connect to the gateway and interact with the mock MCP servers through natural language.
 
-. For *Claude Code* (CLI):
+. For *Claude Code* (CLI), run the following on your desktop, replacing `<paste-your-token>` with the value of `$USER1_TOKEN` from your terminal:
 +
 [source,sh,role="copypaste",subs="+attributes"]
 ----
 claude mcp add --transport http mcp-gateway \
   http://mcp.{openshift_cluster_ingress_domain}/mcp \
-  --header "Authorization: Bearer $USER1_TOKEN"
+  --header "Authorization: Bearer <paste-your-token>"
 ----
 
 . For *Claude Desktop* or *Cursor*, add the following to your MCP server settings, replacing `<paste-your-token>` with the value of `$USER1_TOKEN`:
