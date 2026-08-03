@@ -364,7 +364,7 @@ https://jaeger-mock-mcp-servers.{openshift_cluster_ingress_domain}
 
 . Select the `mcp-gateway` service, then select `mcp-router.tool-call` from the *Operation* dropdown, and click *Find Traces*. This filters to only the tool call traces (excluding initialize and tools/list requests).
 +
-image::mcp-gateway-jaeger-traces.png[Jaeger traces for MCP Gateway,link=_images/mcp-gateway-jaeger-traces.png,window=_blank]
+image::mcp-gateway-jaeger-traces.png[Jaeger traces for MCP Gateway,link=_images/mcp-gateway-jaeger-traces.png,window=ea-images]
 +
 You may also see the earlier rate-limited failures highlighted in red — this is expected and provides a useful view of how the gateway enforces policy.
 
@@ -376,7 +376,7 @@ You may also see the earlier rate-limited failures highlighted in red — this i
 +
 Each span includes MCP-specific tags: `mcp.method.name`, `mcp.server` (e.g., `mock-mcp-servers/inventory`), `mcp.route`, and `mcp.session.id`.
 +
-image::mcp-gateway-jaeger-trace-detail.png[Jaeger trace detail showing span hierarchy and MCP tags,link=_images/mcp-gateway-jaeger-trace-detail.png,window=_blank]
+image::mcp-gateway-jaeger-trace-detail.png[Jaeger trace detail showing span hierarchy and MCP tags,link=_images/mcp-gateway-jaeger-trace-detail.png,window=ea-images]
 
 Traces provide end-to-end visibility into request flow, making it easy to diagnose latency issues, identify failing backends, and understand routing decisions.
 
@@ -458,7 +458,7 @@ claude mcp add --transport http mcp-gateway \
 * _"What is the account status for Acme Corp?"_
 * _"Check if GlobalTech Industries has enough credit for a $10,000 order"_
 +
-image::mcp-gateway-cursor.png[Cursor AI client checking warehouse inventory via MCP Gateway,link=_images/mcp-gateway-cursor.png,window=_blank]
+image::mcp-gateway-cursor.png[Cursor AI client checking warehouse inventory via MCP Gateway,link=_images/mcp-gateway-cursor.png,window=ea-images]
 
 The AI automatically discovers tools, selects the right one for each query, and routes the request through the gateway — with authentication and team isolation enforced transparently.
 

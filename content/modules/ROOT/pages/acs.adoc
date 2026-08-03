@@ -147,7 +147,7 @@ You should see `rhel9-vm` in a `Running` phase. You can also confirm in the Open
 +
 Confirm that `rhel9-vm` is listed and shows a *Running* status.
 +
-image::acs-vm-openshift-virtualmachines.png[OpenShift console VirtualMachines page showing rhel9-vm Running in the acs-virt project,link=_images/acs-vm-openshift-virtualmachines.png,window=_blank]
+image::acs-vm-openshift-virtualmachines.png[OpenShift console VirtualMachines page showing rhel9-vm Running in the acs-virt project,link=_images/acs-vm-openshift-virtualmachines.png,window=ea-images]
 
 . Open the web console for `rhel9-vm` and log in:
 +
@@ -189,13 +189,13 @@ NOTE: The service should be active (or recently successful via the systemd timer
 +
 You should see the `rhel9-vm` workload listed for the `acs-virt` namespace, including CVE counts by severity.
 +
-image::acs-vm-vulnerabilities-list.png[ACS Virtual machine vulnerabilities page listing rhel9-vm with CVE severity counts,link=_images/acs-vm-vulnerabilities-list.png,window=_blank]
+image::acs-vm-vulnerabilities-list.png[ACS Virtual machine vulnerabilities page listing rhel9-vm with CVE severity counts,link=_images/acs-vm-vulnerabilities-list.png,window=ea-images]
 
 . Click `rhel9-vm` and review the reported CVEs and related details.
 +
 Use the *Vulnerabilities*, *Components*, and *Details* tabs to explore findings for the guest OS.
 +
-image::acs-vm-rhel9-cve-details.png[ACS vulnerability details for rhel9-vm showing CVE severity summary and CVE table,link=_images/acs-vm-rhel9-cve-details.png,window=_blank]
+image::acs-vm-rhel9-cve-details.png[ACS vulnerability details for rhel9-vm showing CVE severity summary and CVE table,link=_images/acs-vm-rhel9-cve-details.png,window=ea-images]
 
 ==== Create and onboard a second VM (Optional)
 

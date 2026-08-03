@@ -68,7 +68,7 @@ oc get pods -n openshift-lightspeed
 
 Click the *play button* to automatically execute the command in the terminal on the right — no copy/paste needed.
 
-image::showroom-execute-button.png[Play button on command blocks,link=_images/showroom-execute-button.png,window=_blank]
+image::showroom-execute-button.png[Play button on command blocks,link=_images/showroom-execute-button.png,window=ea-images]
 
 Some blocks (such as URLs, JSON configurations, or PromQL queries) show a *copy icon* instead — click it to copy the text to your clipboard for pasting elsewhere.
 
