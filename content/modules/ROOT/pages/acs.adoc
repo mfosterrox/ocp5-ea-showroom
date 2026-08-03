@@ -232,7 +232,7 @@ EOF
 <2> References the cloud-init Secret created in the previous step
 <3> Clones the cluster `rhel9` DataSource — ACS VM scanning supports RHEL packages indexed by DNF with valid repository links
 +
-. Wait until the VirtualMachineInstance is running:
+. Wait until the VirtualMachineInstance is running. The cloud-init script registers the guest, updates packages, and installs `roxagent` — this may take up to 15 minutes in this demo-sized environment:
 +
 [source,sh,subs="attributes",role=execute]
 ----
