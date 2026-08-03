@@ -18,7 +18,7 @@ Each of these features is covered in more detail in the following sections. Part
 
 *The ACS team asks that you provide feedback on the feature by completing the structured feedback form at the end of each exercise.*
 
-== Environment checks to make sure you're ready to go
+== Before You Begin
 
 * Confirm you can open the OpenShift console and ACS Central tabs in the Showroom UI
 
@@ -40,7 +40,7 @@ oc get vmi -n acs-virt
 +
 You should see `rhel9-vm` in a `Running` phase.
 
-* Deploy the RHACS / OpenShift Security Roadshow demo applications (intentionally vulnerable workloads for ACS testing) from https://github.com/mfosterrox/demo-applications[demo-applications^]:
+* Deploy the RHACS / OpenShift Security Roadshow demo applications. These are intentionally vulnerable workloads for ACS testing) 
 +
 [source,sh,subs="attributes",role=execute]
 ----
@@ -51,10 +51,15 @@ oc apply -R -f k8s-deployment-manifests/juice-shop/
 oc apply -R -f k8s-deployment-manifests/log4shell/
 oc apply -R -f k8s-deployment-manifests/webgoat/
 oc apply -R -f k8s-deployment-manifests/dvwa/
-oc apply -R -f k8s-deployment-manifests/medical-application/
 oc apply -R -f k8s-deployment-manifests/emojivoto/
 ----
 +
+Confirm the emojivoto workloads (used later for the FAM trigger) are running:
++
+[source,sh,subs="attributes",role=execute]
+----
+oc get deploy,pods -n emojivoto
+----
 
 * Verify the ACS MCP server is available:
 +
@@ -75,7 +80,6 @@ copy-central-ca-8jrsn                         0/1     Completed   0          178
 NAME                          HOST/PORT                                                                    PATH   SERVICES                      PORT    TERMINATION          WILDCARD
 acs-mcp-server-stackrox-mcp   acs-mcp-server-stackrox-mcp-acs-mcp.apps.ocp.2bfz7.sandbox5240.opentlc.com          acs-mcp-server-stackrox-mcp   https   reencrypt/Redirect   None
 ----
-+
 
 == Hands-on Exercises
 
@@ -115,13 +119,13 @@ OpenShift Virtualization and RHACS must meet the following requirements:
 
 Each VM to be scanned must meet the following requirements:
 
-* The VM runs Red Hat Enterprise Linux (RHEL) and is registered with Red Hat Subscription Manager with an active RHEL subscription.
+* The VM runs Red Hat Enterprise Linux (RHEL) and is registered with Red Hat Subscription Manager with an active RHEL subscription. VM vulnerability scanning does not cover non-RHEL guest operating systems in this release.
 * VSOCK is enabled on the VM with `spec.domain.devices.autoattachVSOCK: true`.
 * The VM has internet access to download repository-to-Common Platform Enumeration (CPE) mappings.
 * DNF is installed.
 * `roxagent` runs with privileges sufficient to scan package databases and send index reports over a privileged port (typically root or sudo).
 
-NOTE: In the next part of this exercise you create a second VM and apply the same techniques covered here.
+NOTE: In the optional path later in this exercise you create a second VM and apply the same techniques covered here.
 
 ==== Verifying and reviewing the prebuilt VM in ACS
 
@@ -317,13 +321,14 @@ Allow several minutes after the first successful `roxagent` run for results to s
 
 ==== Structured feedback (VM Vulnerability Management)
 
-After completing Part A (and Part B if you ran it), capture feedback for the product team:
+After verifying the prebuilt VM (and creating the optional second VM if you ran that path), capture feedback for the product team:
 
 * Did the prebuilt `rhel9-vm` results appear in ACS without additional ACS UI configuration?
 * If you created `rhel-webserver`: roughly how many minutes from apply → first visible result in ACS?
 * Was the `roxagent` install and VSOCK requirement clear enough to operationalize?
 * Compared with any existing VM scanners you use, what gaps remain (coverage, UX, day-2 ops)?
 * Would unified container + VM visibility in ACS replace a separate VM scanning tool in your organization?
+* Which guest operating systems do you need ACS VM scanning to support next (for example Windows, Ubuntu, or other Linux distributions)?
 
 === Exercise 2: File Activity Monitoring (FAM)
 
@@ -334,8 +339,6 @@ In this exercise you will walk through ACS File Activity Monitoring: how it is e
 Before you trigger a violation, review what RHACS requires for file activity monitoring. These conditions are already met in this lab.
 
 For full product details, see the link:https://docs.redhat.com/en/documentation/red_hat_advanced_cluster_security_for_kubernetes/4.10/html-single/operating/index#configuring-file-activity-monitoring_using-policies-to-provide-security[Configuring file activity monitoring^] topic in the RHACS 4.10 Operating guide.
-
-IMPORTANT: File activity monitoring is a Technology Preview feature.
 
 .How RHACS monitors file activity
 
@@ -354,7 +357,7 @@ RHACS and the secured cluster must meet the following requirements:
 
 * File Activity Monitoring is enabled on the SecuredCluster under `spec.perNode.fileActivityMonitoring.mode: Enabled`.
 * Runtime policies use the *File Path* criterion (RHACS 4.11+ field) with either a *Deployment* or *Node* event source.
-* The architecture is x86 (the only architecture supported for FAM in this preview).
+* The architecture is x86 (currently the only architecture supported for FAM).
 
 NOTE: Node-event violations do *not* appear on the Violations page in the RHACS portal today. Use notifiers or the `/v1/alerts` API for node FAM. Machine Config Operator file changes are not detected.
 
@@ -362,7 +365,7 @@ NOTE: Node-event violations do *not* appear on the Violations page in the RHACS 
 
 This environment already enables FAM on the SecuredCluster and deploys two SecurityPolicy resources via GitOps (same pattern as the RHACS demo FAM setup):
 
-* *Deployment File Activity* — `eventSource: DEPLOYMENT_EVENT`, monitors sensitive paths such as `/etc/**/*`, `/boot/**/*`, and `/usr/**/*` for container/workload file activity.
+* *Deployment File Activity* — `eventSource: DEPLOYMENT_EVENT`, monitors sensitive paths such as `/etc/{asterisk}{asterisk}/{asterisk}`, `/boot/{asterisk}{asterisk}/{asterisk}`, and `/usr/{asterisk}{asterisk}/{asterisk}` for container/workload file activity.
 * *Node File Activity* — `eventSource: NODE_EVENT`, monitors the same path patterns for host-level processes (SSH, systemd, and similar).
 
 . Confirm FAM is enabled on the SecuredCluster:
@@ -382,32 +385,45 @@ Confirm:
 
 * *Lifecycle* is *Runtime*
 * *Event source* is *Deployment*
-* Policy criteria include *File Path* values such as `/etc/**/*`
+* Policy criteria include *File Path* values such as `/etc/{asterisk}{asterisk}/{asterisk}`
 
 . Open *Node File Activity* and confirm the event source is *Node* with the same style of *File Path* criteria.
 +
 TIP: The GitOps source for these policies is in the lab GitOps repository under `acs/acs-instance/templates/fim-deployment-policy.yaml` and `fim-node-policy.yaml`.
 
-. Verify the payments demo workload used for the deploy trigger is running:
+. Confirm the emojivoto demo workload used for the FAM trigger is running:
 +
 [source,sh,subs="attributes",role=execute]
 ----
-oc get deploy visa-processor -n payments
-oc get pods -n payments -l app=visa-processor -o wide
+oc get deploy -n emojivoto
+oc get pods -n emojivoto -o wide
 ----
 +
-NOTE: Use the privileged `visa-processor-sidecar` container for the trigger. The `mastercard-processor` container runs non-root and cannot modify `/etc/passwd`.
+You should see `web`, `emoji`, `voting`, and `vote-bot` deployments with pods in `Running` phase. If they are missing, re-apply from *Before You Begin*:
++
+[source,sh,subs="attributes",role=execute]
+----
+if [ ! -d demo-applications ]; then
+  git clone https://github.com/mfosterrox/demo-applications.git
+fi
+cd demo-applications
+oc apply -R -f k8s-deployment-manifests/emojivoto/
+----
 
 ==== Trigger and review a deployment FAM violation
 
-. Trigger a monitored file operation inside the privileged sidecar:
+. Trigger a monitored file operation inside an emojivoto pod.
++
+OpenShift often runs these containers under a restricted SCC (non-root), so use `oc debug --as-root` against the `web` deployment. That still records as a *deployment* file-activity event for FAM:
 +
 [source,sh,subs="attributes",role=execute]
 ----
-oc exec -n payments deployment/visa-processor -c visa-processor-sidecar -- touch /etc/passwd
+oc debug -n emojivoto deploy/web --as-root -- touch /etc/passwd
 ----
 +
-This matches the *Deployment File Activity* policy (`/etc/**/*` under a deployment event source), following the same trigger pattern used in the RHACS demo FAM setup.
+This matches the *Deployment File Activity* policy (`/etc/{asterisk}{asterisk}/{asterisk}` under a deployment event source).
++
+TIP: If `oc debug --as-root` is unavailable in your client, try `oc exec -n emojivoto deploy/web -c web-svc -- touch /etc/passwd`. That succeeds only when the container can write under `/etc`.
 
 . In ACS Central, open *Violations*.
 +
@@ -452,7 +468,7 @@ curl -sk -u "admin:{common_password}" -G "${CENTRAL}/v1/alerts/summary/groups" \
   --data-urlencode 'query=Policy:"Node File Activity"' | jq .
 ----
 +
-NOTE: Do not expect these alerts on the *Violations* page; that limitation is part of the Technology Preview.
+NOTE: Do not expect these alerts on the *Violations* page; node FAM alerts are available through the API and notifiers today.
 
 ==== Structured feedback (File Activity Monitoring)
 
@@ -460,7 +476,7 @@ After completing the deployment trigger (and the optional node trigger if you ra
 
 * Was File Activity Monitoring already enabled and understandable from the SecuredCluster / policy configuration?
 * Did the *Deployment File Activity* violation appear in the Violations UI after `touch /etc/passwd`? Roughly how long did it take?
-* Are the monitored path patterns (`/etc/**/*`, `/usr/**/*`, and similar) useful for your environment, or too broad/noisy?
+* Are the monitored path patterns (`/etc/{asterisk}{asterisk}/{asterisk}`, `/usr/{asterisk}{asterisk}/{asterisk}`, and similar) useful for your environment, or too broad/noisy?
 * If you ran the node trigger: was API-only visibility for node events acceptable for operations?
 * Would you combine File Path criteria with process criteria (process name, ancestor, UID) for production policies?
 
@@ -497,7 +513,7 @@ OpenShift Lightspeed (in-console) or an external MCP client (Claude Code, Cursor
 .Prerequisites
 
 * The ACS MCP server Deployment and Route are available in `acs-mcp` (preinstalled via GitOps).
-* Central is reachable and the secured cluster is reporting data (completed in the environment checks).
+* Central is reachable and the secured cluster is reporting data (completed in *Before You Begin*).
 * For Lightspeed: OLSConfig includes the `MCPServer` feature gate and an `acs-mcp` server entry (already configured in this lab).
 * For an external client: an ACS API token with at least the *Analyst* role.
 
