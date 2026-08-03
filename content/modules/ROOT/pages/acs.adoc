@@ -203,35 +203,34 @@ In this optional path you deploy a second VirtualMachine from a declarative GitO
 
 IMPORTANT: Schedule the VM on a *worker* node. The ACS collector relay is not enabled on control-plane nodes by default.
 
-. Review the VirtualMachine manifest sections that matter for ACS vulnerability scanning:
+. Create the cloud-init Secret for the VM. Note the callouts for important sections described below the code block:
 +
-* *VSOCK* — `spec.template.spec.domain.devices.autoattachVSOCK: true` so `roxagent` can send index reports to the collector relay.
-* *RHEL guest with subscription and DNF* — ACS VM scanning supports RHEL packages indexed by DNF with valid repository links. Cloud-init registers the guest and enables RHEL repos so scans can map packages to CVEs.
-* *`roxagent` in the guest* — cloud-init installs `roxagent` and schedules it via cron to report package inventory to ACS.
-+
-[source,yaml]
-----
-devices:
-  autoattachVSOCK: true
-----
-
-. Create a Secret containing the cloud-init userdata. The cloud-init script registers the guest with Subscription Manager, installs demo packages, and runs `roxagent` on a cron schedule so ACS can report VM vulnerabilities:
-+
-[source,sh,role=execute]
+[source,yaml,role=execute]
 ----
 oc apply -f - <<'EOF'
 include::example$rhel-webserver-cloudinit-secret.yaml[]
 EOF
 ----
-
-. Apply the VirtualMachine manifest. This enables VSOCK, clones the cluster `rhel9` DataSource, and references the cloud-init Secret created above:
 +
-[source,sh,role=execute]
+<1> Cloud-init userdata stored in a Secret for easier management
+<2> Registers the guest and enables RHEL 9.6 repos so ACS scans can map packages to CVEs
+<3> Installs demo packages with known CVEs for ACS to detect
+<4> Installs `roxagent` — scans installed packages and reports index to ACS Central via VSOCK
+<5> Schedules `roxagent` via cron to report package inventory every 10 minutes
+<6> Starts a simple httpd server as an additional scannable workload
+
+. Create the VirtualMachine. Note the callouts for important sections described below the code block:
++
+[source,yaml,role=execute]
 ----
 oc apply -f - <<'EOF'
 include::example$rhel-webserver-vm.yaml[]
 EOF
 ----
++
+<1> VSOCK enabled so `roxagent` can send index reports to the ACS collector relay
+<2> References the cloud-init Secret created in the previous step
+<3> Clones the cluster `rhel9` DataSource — ACS VM scanning supports RHEL packages indexed by DNF with valid repository links
 +
 . Wait until the VirtualMachineInstance is running:
 +

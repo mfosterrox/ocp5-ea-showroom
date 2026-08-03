@@ -19,8 +19,7 @@ spec:
           sockets: 1
           threads: 1
         devices:
-          # Required for ACS VM scanning: roxagent reports over VSOCK to the collector relay
-          autoattachVSOCK: true
+          autoattachVSOCK: true # <1>
           disks:
             - bootOrder: 1
               disk:
@@ -56,7 +55,7 @@ spec:
         - name: cloudinitdisk
           cloudInitNoCloud:
             secretRef:
-              name: rhel-webserver-cloudinit
+              name: rhel-webserver-cloudinit # <2>
   dataVolumeTemplates:
     - apiVersion: cdi.kubevirt.io/v1beta1
       kind: DataVolume
@@ -65,7 +64,7 @@ spec:
       spec:
         sourceRef:
           kind: DataSource
-          name: rhel9
+          name: rhel9 # <3>
           namespace: openshift-virtualization-os-images
         storage:
           resources:
