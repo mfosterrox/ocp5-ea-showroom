@@ -331,13 +331,19 @@ for i in $(seq 1 10); do
 done
 ----
 
-. Revert the rate limit:
+. Clean up by deleting the modified RateLimitPolicy — OpenShift GitOps (Argo CD) will automatically restore the original definition:
++
+[source,sh,role=execute]
+----
+oc delete ratelimitpolicy mcp-gateway-ratelimit -n mock-mcp-servers
+----
++
+Wait a moment for ArgoCD to recreate it, then verify it's back:
 +
 [source,sh,role=execute]
 ----
 oc get ratelimitpolicy mcp-gateway-ratelimit -n mock-mcp-servers -o json \
-  | jq '.spec.limits["per-user"].rates[0].limit = 30' \
-  | oc replace -f -
+  | jq '.spec.limits["per-user"].rates[0].limit'
 ----
 
 Policy changes are reconciled by the MCP Gateway operator and applied without any gateway restart or downtime.
