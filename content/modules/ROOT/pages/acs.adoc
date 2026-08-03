@@ -219,9 +219,9 @@ devices:
 +
 This YAML enables VSOCK, clones the cluster `rhel9` DataSource, registers the guest with Subscription Manager, installs demo packages, and runs `roxagent` on a cron schedule so ACS can report VM vulnerabilities:
 +
-[source,yaml,subs="+attributes,macros+"]
+[source,yaml,subs="+attributes,macros+",role="copypaste"]
 ----
-include::https://raw.githubusercontent.com/rhpds/ocp5-ea-showroom/main/content/modules/ROOT/examples/rhel-webserver-vm.yaml[]
+include::example$rhel-webserver-vm.yaml[]
 ----
 +
 . Wait until the VirtualMachineInstance is running:
