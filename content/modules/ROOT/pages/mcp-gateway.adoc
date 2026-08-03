@@ -251,6 +251,8 @@ done
 ----
 +
 The first 30 requests show green `200 OK`, then requests 31+ show red `429 RATE LIMITED`.
++
+NOTE: You may hit the rate limit before request 30 if previous exercises consumed some of your per-minute quota. The important thing is that the limit _is_ hit and you see the transition from green `200` to red `429`.
 
 . Inspect the rate limit headers returned on a 429 response:
 +
