@@ -43,7 +43,6 @@ _Content coming soon._
 
 == Known Limitations
 
-* The agentic CRDs are managed by CVO on some engineering candidate builds — a workaround Job overrides this automatically
 * The agentic sandbox image may need to be pinned to a specific digest if the latest build has SDK issues
 * GPT-5 agentic execution can be non-deterministic (sometimes refuses to call the exec_command tool)
 

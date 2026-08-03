@@ -28,7 +28,6 @@ or troubleshooting.
 ** ApprovalPolicy CR for execution gate control
 ** Agentic console plugin for UI-driven troubleshooting
 ** CRDs installed via a sync Job from upstream GitHub
-** CVO override Job to prevent CVO from reverting agentic CRDs
 
 == Red Hat Advanced Cluster Security (ACS) 5
 
