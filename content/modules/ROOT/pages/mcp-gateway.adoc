@@ -423,7 +423,7 @@ MCP-compatible AI clients can connect to the gateway and interact with the mock 
 
 . For *Claude Code* (CLI):
 +
-[source,sh,role=execute,subs="+attributes"]
+[source,sh,role="copypaste",subs="+attributes"]
 ----
 claude mcp add --transport http mcp-gateway \
   http://mcp.{openshift_cluster_ingress_domain}/mcp \

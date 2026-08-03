@@ -54,7 +54,7 @@ NOTE: The commands above log in as `mcp-admin` to obtain the token, then immedia
 +
 For *Claude Code* (CLI), run:
 +
-[source,sh,role=execute,subs="+attributes"]
+[source,sh,role="copypaste",subs="+attributes"]
 ----
 claude mcp add --transport http openshift \
   https://mcp-server.{openshift_cluster_ingress_domain}/mcp \
