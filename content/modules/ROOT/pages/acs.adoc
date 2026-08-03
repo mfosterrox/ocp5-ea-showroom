@@ -215,13 +215,22 @@ devices:
   autoattachVSOCK: true
 ----
 
-. Review and apply the VirtualMachine manifest.
+. Create a Secret containing the cloud-init userdata. The cloud-init script registers the guest with Subscription Manager, installs demo packages, and runs `roxagent` on a cron schedule so ACS can report VM vulnerabilities:
 +
-This YAML enables VSOCK, clones the cluster `rhel9` DataSource, registers the guest with Subscription Manager, installs demo packages, and runs `roxagent` on a cron schedule so ACS can report VM vulnerabilities:
-+
-[source,yaml,subs="+attributes,macros+",role="copypaste"]
+[source,sh,role=execute]
 ----
+oc apply -f - <<'EOF'
+include::example$rhel-webserver-cloudinit-secret.yaml[]
+EOF
+----
+
+. Apply the VirtualMachine manifest. This enables VSOCK, clones the cluster `rhel9` DataSource, and references the cloud-init Secret created above:
++
+[source,sh,role=execute]
+----
+oc apply -f - <<'EOF'
 include::example$rhel-webserver-vm.yaml[]
+EOF
 ----
 +
 . Wait until the VirtualMachineInstance is running:
