@@ -41,7 +41,7 @@ spec:
           bootloader:
             efi: {}
         machine:
-          type: pc-q35-rhel9.6.0
+          type: pc-q35-rhel9.6.0   # Matches RHEL 9/10 compat
         memory:
           guest: 2Gi
       networks:
@@ -50,7 +50,7 @@ spec:
       terminationGracePeriodSeconds: 180
       volumes:
         - dataVolume:
-            name: rhel-webserver
+            name: rhel-webserver   # Will create/manage the PVC
           name: rootdisk
         - name: cloudinitdisk
           cloudInitNoCloud:
