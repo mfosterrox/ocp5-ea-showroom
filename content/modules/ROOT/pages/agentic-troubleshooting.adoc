@@ -91,7 +91,7 @@ _"Investigate the timeout connection in the service-mesh namespace"_
 +
 Lightspeed will query the MCP server, examine pod logs and events, and identify the root cause — a NetworkPolicy blocking the frontend from reaching the backend service.
 +
-NOTE: During investigation, Lightspeed may prompt you to approve certain tools such as `pod_exec`. More powerful tools require explicit approval before the agent can use them. Click *Approve* to allow Lightspeed to proceed.
+NOTE: During investigation, Lightspeed may prompt you to approve certain tools such as `pod_exec`. More powerful tools require explicit approval before the agent can use them. Click *Approve* to allow Lightspeed to proceed. It is normal for `pod_exec` to occasionally fail — security-hardened pods on OpenShift use minimal container images that may not include common shell utilities like `ss`, `netstat`, or `dig`. Lightspeed uses any available signals from a wide range of components (pod logs, events, Prometheus metrics, resource state) to analyze and correlate issues, so a failed exec does not prevent a successful investigation.
 +
 image::agentic-troubleshooting-tool-approval.png[Tool approval prompt in Lightspeed,link=_images/agentic-troubleshooting-tool-approval.png,window=_blank]
 
