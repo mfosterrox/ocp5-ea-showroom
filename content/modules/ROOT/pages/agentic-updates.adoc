@@ -4,26 +4,20 @@ include::partial$_attributes.adoc[]
 
 == Feature Overview
 
-Upgrade Intelligence brings AI-powered upgrade advisory to OpenShift. When a new cluster version becomes available, the system automatically analyzes your cluster's readiness and provides a risk-scored recommendation — all without manual intervention.
+Upgrade Intelligence brings AI-powered upgrade advisory to OpenShift. When a new cluster version becomes available, the system analyzes your cluster's readiness and provides an AI recommendation.
 
 The workflow:
 
-1. *Automatic detection* — The upgrade adapter controller detects new versions via `ClusterVersion.status.availableUpdates` and creates an AgenticRun CR.
-2. *AI-powered analysis* — The agent runs prechecks (degraded ClusterOperators, firing alerts, deprecated API usage, conditional update risks) and produces a deterministic risk score using the formula: `(degraded COs x 3) + (critical alerts x 2) + (deprecated APIs x 1) + (conditional risks x 2)`.
-3. *Risk-scored proposal* — The proposal appears in the Console's Cluster Update page with a risk level (LOW/MEDIUM/HIGH), precheck evidence table, and AI-generated summary.
-4. *Human decision* — The admin reviews and either approves (triggering the CVO upgrade) or denies the proposal. Proposals expire after 24 hours if no action is taken.
-5. *RefineChat* — For HIGH-risk proposals, the admin can open a chat sidebar to ask follow-up questions like "What's wrong with the monitoring operator?" and get cluster-specific answers.
+1. *Agentic Updates* — The upgrade agent controller detects new versions via `ClusterVersion.status.availableUpdates`, runs prechecks (degraded ClusterOperators, firing alerts, deprecated API usage, conditional update risks), and produces an AI recommendation. The update proposal appears in the Console's Cluster Update page with a risk level, precheck evidence table, and AI-generated summary. This is Tech Preview in 5.0 and in the future GA of this feature we will allow the admin to review and either approve (triggering the CVO upgrade) or deny the proposal.
+5. *AI assessment buttons* — In 5.0 we GA AI-powered buttons on the *ClusterSettings* page. Unlike the agentic analysis, these are user-initiated Lightspeed chat interactions — clicking a button opens the Lightspeed chat with a hidden system prompt and returns results directly in the chat UI. The admin types zero prompts. This is GA in 5.0. The admin can ask follow-up questions like "What's wrong with the monitoring operator?" and get cluster-specific answers.
 
 Key components:
 
 * *Agentic Operator* — manages the lifecycle of agents, LLM providers, and approval policies
-* *Agent CR* — defines an AI agent with a specific LLM provider and model
-* *LLMProvider CR* — configures credentials and endpoints for LLM backends (OpenAI, Azure, Vertex AI)
-* *ApprovalPolicy CR* — controls whether agent-proposed actions require human approval before execution
-* *AgenticRun CR* — triggers an analysis and optional execution workflow
-* *Console Plugin* — provides a UI for viewing agent activity, proposals, and the RefineChat sidebar
+* *AgenticRun CR* — triggers an analysis workflow
+* *Console Plugin* — provides a UI for viewing agent activity, proposals.
 
-In addition to the agentic analysis, OCP 5.0 adds three AI-powered buttons to the existing *ClusterSettings* update workflow. These buttons use Lightspeed chat to provide zero-prompt AI assistance at each phase of the update lifecycle — Pre-check, Update Status, and Troubleshoot. Unlike the agentic analysis (which creates AgenticRun CRs), these are user-initiated chat interactions that open Lightspeed with a hidden system prompt and return results directly in the chat UI.
+In addition to the agentic analysis (Tech Preview), OCP 5.0 adds three AI-powered buttons (GA) to the existing *ClusterSettings* update workflow. These buttons use Lightspeed chat to provide zero-prompt AI assistance at each phase of the update lifecycle — Pre-check, Update Status, and Troubleshoot. Unlike the agentic analysis (which creates AgenticRun CRs), these are user-initiated chat interactions that open Lightspeed with a hidden system prompt and return results directly in the chat UI.
 
 == Before You Begin
 
@@ -38,19 +32,21 @@ In addition to the agentic analysis, OCP 5.0 adds three AI-powered buttons to th
 
 The exercises are organized into two sections:
 
-* *Exercises 1–6* cover the *Agentic Updates* workflow on the Cluster Update page — AI-driven analysis via AgenticRun CRs that evaluate cluster readiness against a target version.
-* *Exercises 7–11* cover the *AI-Assisted Update Buttons* on the ClusterSettings page — user-initiated Lightspeed chat interactions that provide zero-prompt assistance through the update lifecycle.
+* *Exercises 1–5* cover the *Agentic Updates* workflow on the Cluster Update page — AI-driven analysis via AgenticRun CRs that evaluate cluster readiness against a target version. Tech Preview Feature.
+* *Exercises 6–10* cover the *AI-Assisted Update Buttons* on the ClusterSettings page — user-initiated Lightspeed chat interactions that provide zero-prompt assistance through the update lifecycle. This is GA in 5.0.
 
 === Exercise 1: Analyze a Healthy Cluster (Recommended Path)
 
-In this exercise, you will run an AI-powered upgrade analysis on a healthy cluster and verify that the system produces a *Recommended* result with a LOW risk score.
+In this exercise, you will run an AI-powered upgrade analysis on a healthy cluster and verify that the system produces a *Recommended* result.
 
 . Navigate to the *Cluster Update* page in the OpenShift console. You should see available update paths listed for your cluster.
++
 image::agentic-updates-cluster-update-page.png[Cluster Update page showing available paths,link=_images/agentic-updates-cluster-update-page.png,window=ea-images]
 
 . Select an available update path (for example, the highest patch version in the current channel).
 
 . Click the *Analyze* button. This creates an AgenticRun CR and triggers the AI agent to perform a full cluster readiness analysis.
++
 image::agentic-updates-analyze-button.png[Analyze button on update path,link=_images/agentic-updates-analyze-button.png,window=ea-images]
 
 . Wait for the analysis to complete (typically under 5 minutes). The page will update with the results.
@@ -58,7 +54,6 @@ image::agentic-updates-analyze-button.png[Analyze button on update path,link=_im
 . Review the analysis results. On a healthy cluster you should see:
 +
 --
-* *Risk Score*: 0 (LOW) with a GREEN badge
 * *AI Recommendation*: Recommended
 * *Platform Analysis*: All ClusterOperators Available=True, no degraded operators
 * *Node Health*: All nodes Ready, no scheduling disabled
@@ -66,11 +61,12 @@ image::agentic-updates-analyze-button.png[Analyze button on update path,link=_im
 * *Precheck Evidence Table*: All checks passed
 * *AI Summary*: Confirms cluster readiness in natural language
 --
++
 image::agentic-updates-healthy-result.png[Healthy cluster analysis results,link=_images/agentic-updates-healthy-result.png,window=ea-images]
 +
 image::agentic-updates-healthy-result-1.png[Detailed healthy cluster analysis view,link=_images/agentic-updates-healthy-result-1.png,window=ea-images]
 
-. Verify the risk score by cross-checking with the cluster state. Run these commands and confirm zero issues across all inputs:
+. Verify the recommendation by cross-checking with the cluster state. Run these commands and confirm zero issues across all inputs:
 +
 [source,sh,role=execute]
 ----
@@ -80,9 +76,7 @@ echo "=== Critical Alerts ===" && \
 oc get pods -n openshift-monitoring -l app.kubernetes.io/name=alertmanager --no-headers -o name | head -1 | xargs -I{} oc exec -n openshift-monitoring {} -c alertmanager -- amtool alert --alertmanager.url=http://localhost:9093 2>/dev/null | grep -c critical || echo "0 critical"
 ----
 +
-If all inputs are zero, the risk score should be exactly 0 (LOW) — matching the formula output.
-
-This exercise validates the core happy path: version detection, on-demand analysis, deterministic risk scoring, and AI recommendation on a clean cluster.
+This exercise validates the core happy path: version detection, on-demand analysis and AI recommendation on a clean cluster.
 
 === Exercise 2: Analyze a HIGH-Risk Cluster (Not Recommended Path)
 
@@ -104,14 +98,12 @@ NOTE: This may take a few minutes for the ClusterOperator condition to change to
 . Review the results. With a degraded ClusterOperator, you should see:
 +
 --
-* *Risk Score*: 3+ (MEDIUM or higher) depending on how many conditions degrade
 * *AI Recommendation*: *Not Recommended* with a RED badge
 * *Precheck Evidence Table*: Names the specific degraded ClusterOperator(s) and any firing alerts
 * *AI Summary*: Explains why the upgrade is not recommended, referencing the specific degraded components
 --
++
 image::agentic-updates-high-risk-result.png[HIGH risk analysis results,link=_images/agentic-updates-high-risk-result.png,window=ea-images]
-
-. Verify the risk score formula: if 1 CO is degraded and 1 critical alert is firing, the expected score is `(1 × 3) + (1 × 2) = 5` (MEDIUM). If additional conditions degrade, the score will increase.
 
 . *Restore the cluster* before proceeding to the next exercise:
 +
@@ -122,7 +114,7 @@ oc scale deployment prometheus-adapter -n openshift-monitoring --replicas=1
 +
 Wait for the ClusterOperator to return to Available=True, Degraded=False.
 
-This exercise validates that the risk scoring formula is deterministic, that the evidence table names specific failing components, and that the AI recommendation correctly reflects cluster health.
+This exercise validates that the AI recommendation correctly reflects cluster health.
 
 === Exercise 3: Reanalyze After Fixing Issues
 
@@ -139,12 +131,11 @@ Expected: `Available=True, Degraded=False, Progressing=False`
 
 . Navigate to the *Cluster Update* page and click *Reanalyze* on the same update path.
 
-. A new AgenticRun CR is created (not an update to the old one). Wait for analysis to complete.
+. Wait for AgenticRun CR analysis to complete.
 
 . Verify the results now show:
 +
 --
-* *Risk Score*: Lower than Exercise 2 (should return to 0 if all issues resolved)
 * *AI Recommendation*: Should change to *Recommended* with GREEN badge
 * *Previous analysis* visible in the activity log — the HIGH-risk result from Exercise 2 should still be accessible
 --
@@ -174,7 +165,7 @@ oc get csv -A --no-headers | awk '{print $2, $NF}' | sort -u
 * *Unknown* — operator has no compatibility metadata
 --
 
-. If PLCC (Product Lifecycle) data is available, operators with fewer than 4 months of remaining lifecycle should be flagged with an update recommendation.
+. The Product Lifecycle data will flag operators with fewer than 4 months of remaining lifecycle with an update recommendation.
 
 . Verify the compatibility assessment matches the actual operator metadata:
 +
@@ -218,38 +209,9 @@ oc get clusterversion version -o jsonpath='{range .status.availableUpdates[*]}{.
 
 NOTE: If only one version is available, this exercise can be skipped. It validates the multi-path scenario that can occur naturally when channel updates include multiple versions.
 
-=== Exercise 6: Graceful Degradation Without LLM
+=== Exercise 6: Pre-check — Without Version Selected (User-Initiated)
 
-This exercise validates that the system still provides useful output even when the LLM backend is unavailable.
-
-. Temporarily break the LLM connection by editing the LLMProvider to use invalid credentials:
-+
-[source,sh,role=execute]
-----
-oc get llmprovider -n openshift-lightspeed -o name | head -1 | xargs -I{} oc annotate {} testing.openshift.io/original-config="saved" -n openshift-lightspeed --overwrite
-----
-+
-CAUTION: Record the current LLM provider configuration before modifying it. You will need to restore it after this exercise.
-
-. Navigate to the *Cluster Update* page and click *Analyze* on an update path.
-
-. Even without LLM access, verify that:
-+
---
-* An AgenticRun CR *is* created
-* *Risk score* is still computed correctly (the formula is deterministic, not LLM-dependent)
-* *Precheck evidence table* is populated with pass/fail results (prechecks use `oc` commands, not LLM calls)
-* AI summary shows: *"AI unavailable — prechecks only"*
-* No error state blocks the administrator from viewing the results
---
-
-. *Restore the LLM provider configuration* after completing the exercise.
-+
-NOTE: The key insight here is that the risk scoring formula and prechecks are deterministic — they do not depend on the LLM. The LLM provides the natural-language summary and recommendation, but the structured data (risk score, evidence table) is always available regardless of LLM status.
-
-=== Exercise 7: Pre-check — Without Version Selected (User-Initiated)
-
-Exercises 7–11 cover the AI-powered buttons on the *ClusterSettings* page. Unlike the agentic analysis in Exercises 1–6, these are user-initiated Lightspeed chat interactions — clicking a button opens the Lightspeed chat with a hidden system prompt and returns results directly in the chat UI. The admin types zero prompts.
+Exercises 6–10 cover the AI-powered buttons on the *ClusterSettings* page.
 
 IMPORTANT: These buttons require Lightspeed to be installed and configured. If Lightspeed is not available, the buttons are hidden and the existing ClusterSettings workflow is unaffected.
 
@@ -269,9 +231,10 @@ IMPORTANT: These buttons require Lightspeed to be installed and configured. If L
 * ClusterVersion conditions
 * Formatted with icons/emojis — no raw JSON
 --
++
 image::agentic-updates-precheck-no-version.png[Pre-check without version selected,link=_images/agentic-updates-precheck-no-version.png,window=ea-images]
 
-=== Exercise 8: Pre-check — With Version Selected (User-Initiated)
+=== Exercise 7: Pre-check — With Version Selected (User-Initiated)
 
 . On the same *Cluster Settings* page, click to select a target version from the available updates. A modal should display all available versions from Cincinnati.
 
@@ -288,7 +251,7 @@ image::agentic-updates-precheck-no-version.png[Pre-check without version selecte
 +
 image::agentic-updates-precheck-version-selected.png[Pre-check with version selected,link=_images/agentic-updates-precheck-version-selected.png,window=ea-images]
 
-=== Exercise 9: Update Status During an Active Update (User-Initiated)
+=== Exercise 8: Update Status During an Active Update (User-Initiated)
 
 NOTE: This exercise requires an active update to be in progress. Only proceed if you are comfortable starting an upgrade on the EAP cluster.
 
@@ -303,14 +266,14 @@ NOTE: This exercise requires an active update to be in progress. Only proceed if
 * Control plane component progress
 * Node update progress
 * Estimated remaining time
-* Content matches what `oc adm upgrade` would show — formatted with icons/emojis
+* Content similar to what `oc adm upgrade` would show — formatted with icons/emojis
 --
 +
 image::agentic-updates-update-status.png[Update Status response in Lightspeed chat,link=_images/agentic-updates-update-status.png,window=ea-images]
 
-. Click *Update Status* again later during the update. The completion percentage should be higher and the estimated time lower than the first check.
+. Click *Update Status* again later during the update. 
 
-=== Exercise 10: Troubleshoot a Failing Update (User-Initiated)
+=== Exercise 9: Troubleshoot a Failing Update (User-Initiated)
 
 NOTE: This exercise requires an update that has stalled or is failing (Failing=True or Available=False). This may occur naturally or can be simulated by intentionally breaking an operator during an update.
 
@@ -327,7 +290,7 @@ NOTE: This exercise requires an update that has stalled or is failing (Failing=T
 
 . Click the observability link to navigate to the monitoring dashboard showing the relevant failing components.
 
-=== Exercise 11: Button Visibility Lifecycle (User-Initiated)
+=== Exercise 10: Button Visibility Lifecycle (User-Initiated)
 
 This exercise validates that the AI buttons appear and disappear correctly through the full update cycle:
 
@@ -355,9 +318,7 @@ Navigate through each phase and verify the buttons match the expected state.
 
 == Key Takeaways
 
-* The agentic system extends Lightspeed from Q&A to autonomous cluster operations
-* ApprovalPolicy provides a safety gate — nothing executes without explicit approval (unless configured otherwise)
-* AgenticRun is the entry point for triggering analysis and remediation workflows
-* Risk scoring is *deterministic* — the same cluster state always produces the same score, regardless of which LLM is used
+
 * All analysis is *read-only* — the agent sandbox cannot modify cluster state
+* The agentic system extends Lightspeed from Q&A to autonomous cluster operations
 * The ClusterSettings AI buttons provide zero-prompt, user-initiated chat assistance through the full update lifecycle: Pre-check → Start Update → Update Status → Troubleshoot
