@@ -27,39 +27,6 @@ These issues are designed to leave a causal trail — cascading failures with an
 
 == Before You Begin
 
-. Apply a temporary workaround for the agentic sandbox pod spec. This fixes a known issue where the sandbox pod fails to create due to duplicate volume definitions:
-+
-[source,sh,role=execute]
-----
-oc -n openshift-gitops patch application app-of-apps --type json \
-  -p '[{"op":"remove","path":"/spec/syncPolicy/automated"}]' 2>/dev/null || true
-oc -n openshift-gitops patch application openshift-lightspeed --type json \
-  -p '[{"op":"remove","path":"/spec/syncPolicy/automated"}]' 2>/dev/null || true
-oc -n openshift-gitops patch application openshift-agentic-lightspeed --type json \
-  -p '[{"op":"remove","path":"/spec/syncPolicy/automated"}]' 2>/dev/null || true
-oc scale deployment lightspeed-operator-controller-manager \
-  -n openshift-lightspeed --replicas=0
-sleep 5
-oc get configmap lightspeed-agentic-configuration -n openshift-lightspeed -o json \
-  | python3 -c '
-import sys,json
-cm = json.load(sys.stdin)
-podspec = json.loads(cm["data"]["sandbox-pod-spec"])
-podspec["volumes"] = [v for v in podspec.get("volumes",[]) if v["name"] != "skills-workdir"]
-for c in podspec.get("containers",[]):
-    c["volumeMounts"] = [m for m in c.get("volumeMounts",[]) if m["name"] != "skills-workdir"]
-    c["securityContext"] = {"allowPrivilegeEscalation": False, "capabilities": {"drop": ["ALL"]}}
-podspec["securityContext"] = {"runAsNonRoot": True, "seccompProfile": {"type": "RuntimeDefault"}}
-cm["data"]["sandbox-pod-spec"] = json.dumps(podspec)
-cm["metadata"].pop("managedFields", None)
-cm["metadata"].pop("resourceVersion", None)
-print(json.dumps(cm))
-' | oc replace -f -
-echo "Workaround applied — OLS operator remains scaled down to prevent revert"
-----
-+
-NOTE: This workaround leaves the OLS operator scaled down and ArgoCD paused to prevent the fix from being reverted. The Lightspeed chat and other OLS-managed features will continue to function, but the operator will not reconcile configuration changes until it is scaled back up. A permanent fix is being developed upstream.
-
 . Verify the troubleshooting applications are deployed. You should expect to see a mix of `Running`, `Completed`, and `ImagePullBackOff` statuses — this is intentional, as these broken states are what the agentic system will investigate:
 +
 [source,sh,role=execute]
