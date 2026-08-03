@@ -11,6 +11,9 @@ view_switcher:
   default_mode: split
 
 tabs:
+  - name: Terminal
+    path: /wetty
+    port: 443
   # These UIs send X-Frame-Options / frame-ancestors that block Showroom iframes.
   # external: true opens them in a new browser tab instead.
   - name: OpenShift Console
@@ -22,6 +25,3 @@ tabs:
   - name: OpenShift GitOps
     url: 'https://openshift-gitops-server-openshift-gitops.${DOMAIN}'
     external: true
-  - name: Terminal
-    path: /wetty
-    port: 443
