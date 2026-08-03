@@ -4,7 +4,7 @@ include::partial$_attributes.adoc[]
 
 == Feature Overview
 
-The MCP Gateway, part of Red Hat Connectivity Link, provides a centralized entry point for accessing multiple MCP servers through a single endpoint. It handles server federation, tool discovery, team-based access control, authentication, rate limiting, and policy enforcement — all without requiring changes to the backend MCP servers.
+The MCP Gateway, part of Red Hat Connectivity Link, builds on top of the routing capabilities of Envoy — a conformance-tested implementation of the Kubernetes Gateway API — to handle the Model Context Protocol. It enables platform engineers and teams to expose MCP servers via a gateway as secure, protected services, just as they do with existing RESTful APIs. This extends the benefits of the Envoy proxy to AI agent systems that require data or need to perform actions through backend MCP servers, providing server federation, tool discovery, team-based access control, authentication, rate limiting, and policy enforcement — all without requiring changes to the backend MCP servers.
 
 ----
                           ┌─────────────────────────────────┐
@@ -84,6 +84,16 @@ oc get mcpserverregistrations -n mock-mcp-servers
 ----
 +
 You should see `inventory`, `payments`, and `accounts` all showing `READY: True`.
+
+. Explore the Connectivity Link console plugin. The MCP Gateway console plugin extends the OpenShift web console with a dedicated UI for managing gateway resources. It provides an overview dashboard, policy management views, a policy topology graph, and API deployment tracking (API deployments are not used in this environment — only MCP Gateway resources).
++
+Navigate to *Connectivity Link > Overview* in the OpenShift console and select *All Projects* from the project dropdown to see a dashboard of gateway health, policy counts, and HTTPRoute summary across the cluster.
++
+image::mcp-gateway-connectivity-link-overview.png[Connectivity Link Overview dashboard showing gateway health and policy counts,link=_images/mcp-gateway-connectivity-link-overview.png,window=ea-images]
++
+Then navigate to *Connectivity Link > Policy Topology* to see a visual graph of how the MCP Gateway, its HTTPRoutes for the mock MCP servers (inventory, payments, accounts), and the attached policies (AuthPolicy, RateLimitPolicy) relate to each other.
++
+image::mcp-gateway-connectivity-link-topology.png[Connectivity Link Policy Topology showing gateway and policy relationships,link=_images/mcp-gateway-connectivity-link-topology.png,window=ea-images]
 
 == Hands-on Exercises
 
