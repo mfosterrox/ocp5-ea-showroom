@@ -56,6 +56,8 @@
     "RBAC",
     "RHACS",
     "rollback",
+    "remediation",
+    "remediations",
     "rollbacks",
     "rollout",
     "rollouts",
