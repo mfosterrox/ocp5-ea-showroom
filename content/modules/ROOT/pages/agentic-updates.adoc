@@ -1,4 +1,4 @@
-= OpenShift Lightspeed Agentic Updates
+= Agentic Updates
 
 include::partial$_attributes.adoc[]
 
@@ -211,7 +211,7 @@ NOTE: If only one version is available, this exercise can be skipped. It validat
 
 === Exercise 6: Pre-check — Without Version Selected (User-Initiated)
 
-Exercises 6–10 cover the AI-powered buttons on the *ClusterSettings* page.
+Exercises 6–9 cover the AI-powered buttons on the *ClusterSettings* page.
 
 IMPORTANT: These buttons require Lightspeed to be installed and configured. If Lightspeed is not available, the buttons are hidden and the existing ClusterSettings workflow is unaffected.
 
@@ -229,7 +229,6 @@ IMPORTANT: These buttons require Lightspeed to be installed and configured. If L
 * ClusterOperator status (Available, Degraded, Progressing)
 * Firing alerts
 * ClusterVersion conditions
-* Formatted with icons/emojis — no raw JSON
 --
 +
 image::agentic-updates-precheck-no-version.png[Pre-check without version selected,link=_images/agentic-updates-precheck-no-version.png,window=ea-images]
@@ -246,7 +245,7 @@ image::agentic-updates-precheck-no-version.png[Pre-check without version selecte
 * Conditional update risks for the selected target
 * ClusterVersion conditions relevant to the target
 * Accepted risks information
-* Same icon/emoji formatting — zero prompts typed
+* zero prompts typed
 --
 +
 image::agentic-updates-precheck-version-selected.png[Pre-check with version selected,link=_images/agentic-updates-precheck-version-selected.png,window=ea-images]
@@ -266,7 +265,7 @@ NOTE: This exercise requires an active update to be in progress. Only proceed if
 * Control plane component progress
 * Node update progress
 * Estimated remaining time
-* Content similar to what `oc adm upgrade` would show — formatted with icons/emojis
+* Content similar to what `oc adm upgrade` would show — formatted with LLM
 --
 +
 image::agentic-updates-update-status.png[Update Status response in Lightspeed chat,link=_images/agentic-updates-update-status.png,window=ea-images]
@@ -277,44 +276,19 @@ image::agentic-updates-update-status.png[Update Status response in Lightspeed ch
 
 NOTE: This exercise requires an update that has stalled or is failing (Failing=True or Available=False). This may occur naturally or can be simulated by intentionally breaking an operator during an update.
 
-. If the update encounters a failure condition, a *Troubleshoot* button appears on the ClusterSettings page.
+. If the update encounters a failure condition, click the *Update Status* button.
 
-. Click *Troubleshoot*. Lightspeed opens with a response that:
+. Lightspeed opens with a response that:
 +
 --
 * Names the specific failing or degraded components
 * Provides contextual information about the failure
-* Includes a link to the relevant observability dashboard
-* Uses icons/emojis — zero prompts typed
+* zero prompts typed
 --
 
-. Click the observability link to navigate to the monitoring dashboard showing the relevant failing components.
+. Visit the Alerting dashboard to see the relevant failing components.
 
-=== Exercise 10: Button Visibility Lifecycle (User-Initiated)
 
-This exercise validates that the AI buttons appear and disappear correctly through the full update cycle:
-
-[cols="1,3",options="header"]
-|===
-| Phase | Expected Button State
-
-| No update in progress
-| *Pre-check* visible. Update Status and Troubleshoot hidden.
-
-| Version selected
-| *Pre-check* + *Start Update* visible.
-
-| Update started (Progressing=True)
-| Pre-check disappears. *Update Status* appears.
-
-| Update failing (Failing=True)
-| *Troubleshoot* appears alongside Update Status.
-
-| Update complete
-| Buttons reset to pre-update state.
-|===
-
-Navigate through each phase and verify the buttons match the expected state.
 
 == Key Takeaways
 
