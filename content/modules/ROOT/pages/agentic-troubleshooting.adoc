@@ -173,6 +173,22 @@ oc delete pod -l app=lightspeed-agentic-alerts-adapter -n openshift-lightspeed
 +
 image::agentic-troubleshooting-agentic-runs-list.png[Agentic Runs UI showing investigations,link=_images/agentic-troubleshooting-agentic-runs-list.png,window=ea-images]
 
+. You can also manage AgenticRuns from the command line using the `oc agentic` CLI plugin. List all runs:
++
+[source,sh,role=execute]
+----
+oc agentic run list
+----
++
+Get the details of the `PaymentErrorRateHigh` run:
++
+[source,sh,role=execute]
+----
+oc agentic run get $(oc agentic run list -o json | jq -r '.items[].metadata.name' | grep -i payment | head -1)
+----
++
+The `oc agentic` CLI supports the full lifecycle of AgenticRuns: approve or deny proposed remediations (`oc agentic run approve` / `oc agentic run deny`), watch live agent logs (`oc agentic run logs`), or create a new run on demand (`oc agentic run create`). Run `oc agentic --help` to explore all available commands.
+
 . Once an AgenticRun moves to the *Proposed* phase, select it to drill into the step-by-step findings and remediation plan.
 +
 image::agentic-troubleshooting-agentic-run-detail.png[AgenticRun detail with proposed remediation,link=_images/agentic-troubleshooting-agentic-run-detail.png,window=ea-images]
