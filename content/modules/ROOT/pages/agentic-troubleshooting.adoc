@@ -193,13 +193,13 @@ The `oc agentic` CLI supports the full lifecycle of AgenticRuns: approve or deny
 +
 image::agentic-troubleshooting-agentic-run-detail.png[AgenticRun detail with proposed remediation,link=_images/agentic-troubleshooting-agentic-run-detail.png,window=ea-images]
 
-. Review the proposed remediation steps. Select *Option 1* — rollback to the last known good version (v1.0.1) — and click the *Execute remediation* button to authorize the change. It will ask you once again to confirm the execution. Click *Execute Remediation* once more to confirm.
+. Review the proposed remediation steps. Select the option that recommends rolling back to the last known good version — and click the *Execute remediation* button to authorize the change. It will ask you once again to confirm the execution. Click *Execute Remediation* once more to confirm.
 
 . Once the remediation is executed, review the post-execution summary.
 +
 image::agentic-troubleshooting-execution-complete.png[AgenticRun with execution summary,link=_images/agentic-troubleshooting-execution-complete.png,window=ea-images]
 +
-NOTE: The screenshot may show the alert still firing and the AgenticRun in an *Escalating* state. This is expected — Prometheus alerts have a built-in evaluation interval and pending period, so it can take several minutes after a successful remediation for the alert to stop firing.
+NOTE: The screenshot may show the alert still firing and the AgenticRun in an *Escalating* state. This is expected — Prometheus alerts have a built-in evaluation interval and pending period, so it can take several minutes after a successful remediation for the alert to stop firing. When an AgenticRun reaches the *Escalating* state, the agent will not continue attempting to execute the run. Escalating means the issue is being escalated to the operator — review the Verification summary for details, and continue your investigation using the OpenShift Lightspeed chat panel if needed.
 
 This is the full agentic loop — from alert detection through investigation, proposal, approval, and execution — with a human in the loop at every decision point. The system handles the heavy lifting of data correlation and remediation execution, while the operations team retains full control over what changes are made to the cluster.
 
