@@ -69,18 +69,17 @@ or troubleshooting.
 * *MCPServerRegistrations* with prefixed tool names for federation
 * *AuthPolicy* enforcing JWT bearer token authentication via Keycloak
 * *Keycloak setup Job* creates an `mcp-gateway` client and test users (`user1`, `user2`) in the Keycloak realm
+* *Jaeger* (v2.20.0) for OpenTelemetry distributed tracing of MCP requests
 
-=== Team-Isolated Gateways (Scenario 4)
+=== Team-Based Access Control
 
-* *Team A* (`team-a-mcp` namespace)
-** Own Gateway, MCPGatewayExtension, and broker
-** Inventory + accounts mock servers
-** OpenShift Route for HTTPS access (`team-a-mcp.apps...`)
-* *Team B* (`team-b-mcp` namespace)
-** Own Gateway, MCPGatewayExtension, and broker
-** Payments mock server only
-** OpenShift Route for HTTPS access (`team-b-mcp.apps...`)
-* Each team has complete isolation — separate Gateway objects, config secrets, and broker deployments
+* Team isolation via *Keycloak RBAC* — not separate namespaces
+* Keycloak clients per MCPServerRegistration with tool-scoped roles
+* Groups (`team-a`, `team-b`) map to server tool subsets:
+** `user1` (team-a): inventory + accounts tools
+** `user2` (team-b): payments tools only
+* *AuthPolicy* on the gateway uses CEL expressions for tool-level authorization
+* *Per-user rate limiting* (30 req/min) via RateLimitPolicy with JWT `sub` claim counter
 
 == Cluster Observability
 
