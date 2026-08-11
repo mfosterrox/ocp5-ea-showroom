@@ -46,7 +46,7 @@ oc get vmi -n acs-virt
 +
 You should see `rhel9-vm` in a `Running` phase.
 
-* Deploy the RHACS / OpenShift Security Roadshow demo applications. These are intentionally vulnerable workloads for ACS testing) 
+* Deploy the RHACS / OpenShift Security Roadshow demo applications. These are intentionally vulnerable workloads for ACS testing.
 +
 [source,sh,subs="attributes",role=execute]
 ----
@@ -58,13 +58,18 @@ oc apply -R -f k8s-deployment-manifests/log4shell/
 oc apply -R -f k8s-deployment-manifests/webgoat/
 oc apply -R -f k8s-deployment-manifests/dvwa/
 oc apply -R -f k8s-deployment-manifests/emojivoto/
+oc apply -f - <<'EOF'
+include::example$init-container-demo.yaml[]
+EOF
 ----
 +
-Confirm the emojivoto workloads (used later for the FAM trigger) are running:
+Confirm the emojivoto workloads (used later for the FAM trigger) and the init-container demo are running:
 +
 [source,sh,subs="attributes",role=execute]
 ----
 oc get deploy,pods -n emojivoto
+oc rollout status deploy/nginx-with-waitfor -n acs-init-demo --timeout=180s
+oc get deploy,pods -n acs-init-demo
 ----
 
 * Verify the ACS MCP server is available:
@@ -670,19 +675,81 @@ link:https://docs.google.com/forms/d/e/1FAIpQLSdjrEjL3lCfmTTVEwwMct-H72UNZ729RsI
 
 === Exercise 5: Init Container Security Coverage
 
-In this exercise, you will confirm that ACS scans init container images and that Build/Deploy policies can include or exclude them.
+In this exercise you use the init-container workload deployed in *Before You Begin*, confirm ACS sees the containers and scans the init image, create a Build/Deploy policy that can match or skip init containers, edit the policy Filters, then review the resulting violations in ACS.
 
-. _Step placeholder_
+The workload is `nginx-with-waitfor` in namespace `acs-init-demo`: init container `wait-for-api` (`ghcr.io/kitstream/initium:latest`) plus an unprivileged `nginx` main container.
+
+==== 1. Sanity test: inspect containers in ACS
+
+. Confirm the pre-deployed init-container example is running:
 +
-NOTE: Replace with guided steps (for example, deploy a workload with an init container, review scan results, then adjust policy Filters).
+[source,sh,subs="attributes",role=execute]
+----
+oc get deploy,pods -n acs-init-demo
+oc get deploy nginx-with-waitfor -n acs-init-demo -o jsonpath='{range .spec.template.spec.initContainers[*]}{.name}{" -> "}{.image}{"\n"}{end}{range .spec.template.spec.containers[*]}{.name}{" -> "}{.image}{"\n"}{end}'
+----
++
+You should see init container `wait-for-api` and main container `nginx`. If the namespace is missing, re-apply from *Before You Begin*:
++
+[source,sh,subs="attributes",role=execute]
+----
+oc apply -f - <<'EOF'
+include::example$init-container-demo.yaml[]
+EOF
+----
+
+. In ACS Central, open *Configuration Management > Deployments*.
+. Find `nginx-with-waitfor` in namespace `acs-init-demo`.
+. Open the deployment and confirm both containers appear: init `wait-for-api` and main `nginx`.
+. Apply the container-type filter *Container Type: INIT* (wording may vary slightly by build). Confirm `wait-for-api` remains listed and is typed as an init container.
+
+==== 2. Image scanning in Vulnerability Management
+
+. In ACS Central, open *Vulnerability Management > Results* (Images or Deployments view).
+. Locate the init image `ghcr.io/kitstream/initium:latest` (or the digest ACS resolved for it).
+. Confirm the image has a scan result and that findings are attributable to the init container / that image — not only to the main `nginx` image.
+. Open *Risk*, select `nginx-with-waitfor`, and check whether image vulnerabilities for the init container appear in the risk indicators.
+
+==== 3. Policy behavior: create a Build/Deploy policy
+
+The init image uses the mutable tag `latest`. Create a Build and Deploy policy that matches that tag, with *Filters* left at the default so all container types (including init) are evaluated.
+
+. In ACS Central, open *Platform Configuration > Policy Management* → *Create policy*.
+. Configure the policy as follows:
++
+* *Name*: `EA Init Container - Latest Tag`
+* *Lifecycle*: enable *Build* and *Deploy*
+* *Severity*: Medium or High
+* *Policy criteria*: *Image Tag* → `latest`
+* *Filters*: leave at the default (all container types, including init)
+* *Enforcement*: *Inform* / notify (do not block)
+
+. Save and enable the policy.
+
+==== 4. Edit Filters to match or skip init containers
+
+. Edit `EA Init Container - Latest Tag`.
+. Set *Filters* to *skip init containers* (exact label may read "Exclude init containers" or similar).
+. Save the policy and allow about a minute for re-evaluation.
+. Confirm the init-container `:latest` match for `wait-for-api` stops firing while the policy remains enabled.
+. Edit the policy again and set *Filters* back to the default so init containers are included.
+. Save and allow about a minute for re-evaluation so init-container matches return.
+
+==== 5. Review violations in ACS
+
+. Open *Violations* in ACS Central.
+. Filter or search for policy `EA Init Container - Latest Tag` and deployment `nginx-with-waitfor`.
+. Confirm a violation is present that references the init image tag `latest` and, where shown, init container `wait-for-api`.
+. Open the violation details and note whether attribution to the init container (name/image) is clear enough to act on.
+. Compare with *Configuration Management* and *Vulnerability Management* for the same deployment: the containers, scan findings, and policy violation should tell one coherent story for this init-container workload.
++
+NOTE: If the violation attributes only to the deployment without naming the init container, capture that in the feedback form — attribution UX is part of what this EA exercise validates.
 
 ==== Structured feedback (Init Container Security Coverage)
 
 Thank you for completing this exercise! Please help us improve by submitting feedback for Init Container Security Coverage:
 
 link:https://docs.google.com/forms/d/e/1FAIpQLSdjrEjL3lCfmTTVEwwMct-H72UNZ729RsIkUQ8Wvp5yHmtrOw/formResponse[ACS 5.0 Feedback Form — Init Container Security Coverage^]
-
-
 
 == Other Things to Try
 
@@ -695,3 +762,4 @@ link:https://docs.google.com/forms/d/e/1FAIpQLSdjrEjL3lCfmTTVEwwMct-H72UNZ729RsI
 * File activity monitoring provides visibility into security-relevant file access patterns
 * Lightspeed Risk Enrichment (when available) explains and prioritizes ACS Risk findings with AI-assisted context
 * The ACS MCP server enables AI agents to query and act on security data programmatically
+* Init container scanning extends image and policy coverage to init containers
