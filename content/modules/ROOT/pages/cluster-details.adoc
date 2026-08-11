@@ -114,3 +114,16 @@ This environment uses three distinct application sets:
 * Realm: `keycloak`
 * MCP Gateway client: `mcp-gateway` (confidential client with direct access grants)
 * Test users: `user1` / `user1pass`, `user2` / `user2pass`
+
+== Resetting the Environment
+
+To reset the cluster to its pre-exercise state after a tester has completed the exercises, run the reset script from the showroom terminal:
+
+[source,sh,role=execute]
+----
+curl -fsSL https://raw.githubusercontent.com/rhpds/ocp5-ea-showroom/main/reset.sh | bash
+----
+
+This script is idempotent and safe to run multiple times. It reverts exercise-specific changes including scaling demo workloads back up, re-commenting critical alerts, deleting AgenticRuns, removing ACS demo namespaces and VMs, and restoring the troubleshooting scenario to its initial state.
+
+NOTE: BYOM (Bring Your Own Model) changes are not reverted by the reset script. To revert BYOM changes, re-enable ArgoCD auto-sync on the `app-of-apps`, `openshift-lightspeed`, and `openshift-agentic-lightspeed` applications.
