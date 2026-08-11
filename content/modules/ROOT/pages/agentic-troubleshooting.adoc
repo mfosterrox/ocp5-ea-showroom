@@ -199,7 +199,7 @@ image::agentic-troubleshooting-agentic-run-detail.png[AgenticRun detail for Paym
 +
 image::agentic-troubleshooting-execution-complete.png[AgenticRun with execution summary,link=_images/agentic-troubleshooting-execution-complete.png,window=ea-images]
 +
-NOTE: The screenshot may show the alert still firing and the AgenticRun in an *Escalating* state. This is expected — Prometheus alerts have a built-in evaluation interval and pending period, so it can take several minutes after a successful remediation for the alert to stop firing. When an AgenticRun reaches the *Escalating* state, the agent will not continue attempting to execute the run. Escalating means the issue is being escalated to the operator — review the Verification summary for details, and continue your investigation using the OpenShift Lightspeed chat panel if needed.
+NOTE: The remediation may show errors and move into the *Escalating* state. The underlying issue should still be resolved — return to *Observe > Alerting* to verify the `PaymentErrorRateHigh` alert has stopped firing. The escalation workflow is designed for cases where automated remediation is insufficient, allowing operators to open a support case with the diagnostic details collected during the investigation.
 
 This is the full agentic loop — from alert detection through investigation, proposal, approval, and execution — with a human in the loop at every decision point. The system handles the heavy lifting of data correlation and remediation execution, while the operations team retains full control over what changes are made to the cluster.
 
