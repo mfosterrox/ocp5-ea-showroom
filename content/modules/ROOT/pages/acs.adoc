@@ -91,7 +91,7 @@ In this exercise you will walk through the ACS 5 vulnerability scanning capabili
 
 Before you verify the prebuilt VM, review what RHACS requires to scan OpenShift Virtualization workloads. These conditions are already met in this lab for `rhel9-vm`.
 
-For full product details, see the link:https://docs.redhat.com/en/documentation/red_hat_advanced_cluster_security_for_kubernetes/4.10/html-single/operating/index#scanning-virtual-machines_examine-images-for-vulnerabilities[Scanning virtual machines^] topic in the RHACS 4.10 Operating guide.
+For full product details, see the link:https://docs.redhat.com/en/documentation/red_hat_advanced_cluster_security_for_kubernetes/4.11/html-single/operating/index#scanning-virtual-machines_examine-images-for-vulnerabilities[Scanning virtual machines^] topic in the RHACS 4.11 Operating guide.
 
 .How RHACS scans virtual machines
 
@@ -334,11 +334,11 @@ After verifying the prebuilt VM (and creating the optional second VM if you ran 
 
 In this exercise you will walk through ACS File Activity Monitoring: how it is enabled, which policies this lab already deploys, how to trigger a deployment-scoped violation, and how to confirm it in the Violations UI.
 
-==== Understanding the prerequisites for File Activity Monitoring
+==== Understanding the prerequisites for File Activity Monitoring (FAM)
 
 Before you trigger a violation, review what RHACS requires for file activity monitoring. These conditions are already met in this lab.
 
-For full product details, see the link:https://docs.redhat.com/en/documentation/red_hat_advanced_cluster_security_for_kubernetes/4.10/html-single/operating/index#configuring-file-activity-monitoring_using-policies-to-provide-security[Configuring file activity monitoring^] topic in the RHACS 4.10 Operating guide.
+For full product details, see the link:https://docs.redhat.com/en/documentation/red_hat_advanced_cluster_security_for_kubernetes/4.11/html-single/operating/index#configuring-file-activity-monitoring_using-policies-to-provide-security[Configuring file activity monitoring^] topic in the RHACS 4.11 Operating guide.
 
 .How RHACS monitors file activity
 
@@ -359,23 +359,25 @@ RHACS and the secured cluster must meet the following requirements:
 * Runtime policies use the *File Path* criterion (RHACS 4.11+ field) with either a *Deployment* or *Node* event source.
 * The architecture is x86 (currently the only architecture supported for FAM).
 
-NOTE: Node-event violations do *not* appear on the Violations page in the RHACS portal today. Use notifiers or the `/v1/alerts` API for node FAM. Machine Config Operator file changes are not detected.
+NOTE: Node-event violations appear on the Violations page in the RHACS portal, and are also available through notifiers and the `/v1/alerts` API. Machine Config Operator file changes are not detected.
 
 ==== Review the preconfigured FAM policies
 
-This environment already enables FAM on the SecuredCluster and deploys two SecurityPolicy resources via GitOps (same pattern as the RHACS demo FAM setup):
+First, confirm FAM is enabled on the SecuredCluster:
 
-* *Deployment File Activity* — `eventSource: DEPLOYMENT_EVENT`, monitors sensitive paths such as `/etc/{asterisk}{asterisk}/{asterisk}`, `/boot/{asterisk}{asterisk}/{asterisk}`, and `/usr/{asterisk}{asterisk}/{asterisk}` for container/workload file activity.
-* *Node File Activity* — `eventSource: NODE_EVENT`, monitors the same path patterns for host-level processes (SSH, systemd, and similar).
-
-. Confirm FAM is enabled on the SecuredCluster:
-+
 [source,sh,subs="attributes",role=execute]
 ----
 oc get securedcluster -n acs -o jsonpath='{.items[0].metadata.name}{"\n"}{.items[0].spec.perNode.fileActivityMonitoring.mode}{"\n"}'
 ----
-+
+
 You should see the SecuredCluster name and `Enabled`.
+
+With FAM enabled, this environment deploys two SecurityPolicy resources via GitOps (same pattern as the RHACS demo FAM setup):
+
+* *Deployment File Activity* — `eventSource: DEPLOYMENT_EVENT`, monitors sensitive paths such as `/etc/{asterisk}{asterisk}/{asterisk}`, `/boot/{asterisk}{asterisk}/{asterisk}`, and `/usr/{asterisk}{asterisk}/{asterisk}` for container/workload file activity.
+* *Node File Activity* — `eventSource: NODE_EVENT`, monitors the same path patterns for host-level processes (SSH, systemd, and similar).
+
+Review the policies in ACS Central:
 
 . In ACS Central, open *Platform Configuration > Policy Management*.
 +
@@ -446,7 +448,7 @@ What you just proved:: FAM on the secured cluster observed a container file oper
 
 ==== Trigger a node FAM violation
 
-Use this path if you want to exercise host-level file activity. Node FAM alerts are visible through the API (and notifiers), not the Violations UI.
+Use this path if you want to exercise host-level file activity. Node FAM alerts appear on the Violations page in the RHACS portal, and are also available through the API and notifiers.
 
 . Trigger a host file operation via `nsenter` into PID 1 on a worker node:
 +
@@ -459,7 +461,7 @@ oc debug "node/${NODE}" --quiet -- bash -c 'nsenter -t 1 -m -u -i -n -p touch /e
 +
 IMPORTANT: Plain `oc debug node` shells are classified as *deployment* events. The `nsenter` into PID 1 is required so RHACS records a *NODE_EVENT*.
 
-. Query node FAM alerts via the API:
+. In ACS Central, open *Violations* and filter by policy name `Node File Activity` to confirm the node event. You can also query the alert count via the API:
 +
 [source,bash,role="execute",subs="+attributes"]
 ----
@@ -468,7 +470,7 @@ curl -sk -u "admin:{common_password}" -G "${CENTRAL}/v1/alerts/summary/groups" \
   --data-urlencode 'query=Policy:"Node File Activity"' | jq .
 ----
 +
-NOTE: Do not expect these alerts on the *Violations* page; node FAM alerts are available through the API and notifiers today.
+NOTE: Node FAM alerts now appear on the *Violations* page, and remain available through the API and notifiers.
 
 ==== Structured feedback (File Activity Monitoring)
 
@@ -476,8 +478,9 @@ After completing the deployment trigger (and the optional node trigger if you ra
 
 * Was File Activity Monitoring already enabled and understandable from the SecuredCluster / policy configuration?
 * Did the *Deployment File Activity* violation appear in the Violations UI after `touch /etc/passwd`? Roughly how long did it take?
+* Is the level of detail captured in each violation (file path, process context, deployment, timestamp) enough to act on? Is anything missing that you would want to see — for example, correlating the file activity to a specific user?
 * Are the monitored path patterns (`/etc/{asterisk}{asterisk}/{asterisk}`, `/usr/{asterisk}{asterisk}/{asterisk}`, and similar) useful for your environment, or too broad/noisy?
-* If you ran the node trigger: was API-only visibility for node events acceptable for operations?
+* If you ran the node trigger: did the node event appear in the Violations UI, and was the visibility (UI, API, and notifiers) sufficient for operations?
 * Would you combine File Path criteria with process criteria (process name, ancestor, UID) for production policies?
 
 === Exercise 3: Init Container Security Coverage
