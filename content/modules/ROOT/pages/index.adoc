@@ -21,7 +21,7 @@ This environment covers five main feature areas:
 * *OpenShift Lightspeed Agentic Updates* — AI-assisted cluster operations using the new agentic operator, agents, and approval policies
 * *MCP Server* — Model Context Protocol servers for OpenShift and ACS, enabling AI agents to interact with cluster and security APIs
 * *MCP Gateway* — Part of Red Hat Connectivity Link, providing federated MCP access, team isolation, authentication, and policy enforcement
-* *Advanced Cluster Security (ACS) 5* — VM scanning via roxagent, file activity monitoring, MCP server integration, and initContainer scanning
+* *Advanced Cluster Security (ACS) 5* — VM scanning, file activity monitoring, Lightspeed risk enrichment, ACS MCP server integration, and init container scanning
 
 == Credentials
 
