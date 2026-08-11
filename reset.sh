@@ -47,7 +47,7 @@ echo "  Restored reporting-service to v1.0.2 (intentionally bad version)"
 
 # Exercise 4: Revert alerts-adapter-config to disable critical alerts
 oc get configmap alerts-adapter-config -n openshift-lightspeed -o json 2>/dev/null \
-  | jq '.data["config.yaml"] |= gsub("    - critical"; "# +- critical")' \
+  | jq '.data["config.yaml"] |= gsub("    - critical"; "#  - critical")' \
   | oc apply -f - 2>/dev/null || true
 oc delete pod -l app=lightspeed-agentic-alerts-adapter -n openshift-lightspeed 2>/dev/null || true
 echo "  Reverted alerts-adapter-config (critical alerts disabled)"
