@@ -47,7 +47,7 @@ This environment covers five main feature areas:
 | RHEL 9 VM (acs-virt namespace)
 | `{vm_user}`
 | `{vm_password}`
-| https://console-openshift-console.{openshift_cluster_ingress_domain}/k8s/ns/acs-virt/kubevirt.io~v1~VirtualMachine/rhel9-vm[OpenShift Console^]
+| https://console-openshift-console.{openshift_cluster_ingress_domain}/k8s/ns/acs-virt/kubevirt.io{tilde}v1{tilde}VirtualMachine/rhel9-vm[Virtual Machine in OpenShift Console^]
 |===
 
 == Using This Environment
