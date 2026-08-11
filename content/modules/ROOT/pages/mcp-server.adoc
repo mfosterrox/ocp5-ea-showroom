@@ -157,7 +157,12 @@ _"Delete the pod healthy-pod in namespace mcp-demo-logs"_
 +
 _"Create a ConfigMap named hack in namespace default"_
 
-. Verify the AI reports a clear 403 Forbidden error indicating insufficient permissions (e.g., `cannot delete resource "pods"`). The `healthy-pod` should remain Running.
+. Verify the AI reports a permissions error for the ConfigMap creation (e.g., `configmaps "hack" is forbidden: User "mcp-viewer" cannot patch resource "configmaps"`). Confirm the ConfigMap was not created:
++
+[source,sh,role=execute]
+----
+oc get cm hack -n default 2>&1 || echo "ConfigMap not found — RBAC enforcement confirmed"
+----
 +
 IMPORTANT: Switch your AI client back to the `mcp-admin` token (from Exercise 1) before continuing. The remaining exercises require write access and will fail with the `mcp-viewer` token.
 

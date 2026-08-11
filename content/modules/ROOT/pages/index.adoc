@@ -32,7 +32,7 @@ This environment covers five main feature areas:
 | OpenShift Console
 | `{openshift_cluster_admin_username}`
 | `{openshift_cluster_admin_password}`
-| https://console-openshift-console.{openshift_cluster_ingress_domain}[Console^]
+| {openshift_cluster_console_url}[Console^]
 
 | ACS Central
 | `admin`
@@ -47,7 +47,7 @@ This environment covers five main feature areas:
 | RHEL 9 VM (acs-virt namespace)
 | `{vm_user}`
 | `{vm_password}`
-| Via OpenShift Console > Virtualization > VirtualMachines
+| {openshift_cluster_console_url}/k8s/ns/acs-virt/kubevirt.io{tilde}v1{tilde}VirtualMachine/rhel9-vm[Virtual Machine in OpenShift Console^]
 |===
 
 == Using This Environment
