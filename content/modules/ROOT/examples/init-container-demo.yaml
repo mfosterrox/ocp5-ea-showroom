@@ -1,0 +1,57 @@
+# Adapted from the public KitStream initium nginx-waitfor example:
+# https://github.com/KitStream/initium/blob/main/examples/nginx-waitfor/deployment.yaml
+#
+# Lab tweak: wait for the Kubernetes API Service (always present) so the
+# init container completes without an extra backend Deployment.
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: acs-init-demo
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nginx-with-waitfor
+  namespace: acs-init-demo
+  labels:
+    app: nginx-with-waitfor
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: nginx-with-waitfor
+  template:
+    metadata:
+      labels:
+        app: nginx-with-waitfor
+    spec:
+      initContainers:
+        - name: wait-for-api # <1>
+          image: ghcr.io/kitstream/initium:latest # <2>
+          args:
+            - wait-for
+            - --target
+            - tcp://kubernetes.default.svc:443
+            - --timeout
+            - "120s"
+            - --max-attempts
+            - "30"
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 65534
+            readOnlyRootFilesystem: true
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+      containers:
+        - name: nginx
+          image: nginxinc/nginx-unprivileged:1.27-alpine # <3>
+          ports:
+            - containerPort: 8080
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+            runAsNonRoot: true
