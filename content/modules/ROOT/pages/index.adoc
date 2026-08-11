@@ -15,10 +15,9 @@ critical to shaping the GA releases of these technologies.
 
 WARNING: This cluster is owned and operated by Red Hat. *Do not* enter any confidential, non-public, or personally identifiable information (PII) into this environment — including prompts, data, credentials, or any content you would not otherwise share publicly. For more information, refer to the https://www.redhat.com/en/about/all-policies-guidelines[Red Hat Policies and Guidelines^].
 
-This environment covers five main feature areas:
+This environment covers four main feature areas:
 
 * *Agentic Troubleshooting* — Automated root-cause analysis and remediation of application issues triggered by alerts
-* *OpenShift Lightspeed Agentic Updates* — AI-assisted cluster operations using the new agentic operator, agents, and approval policies
 * *MCP Server* — Model Context Protocol servers for OpenShift and ACS, enabling AI agents to interact with cluster and security APIs
 * *MCP Gateway* — Part of Red Hat Connectivity Link, providing federated MCP access, team isolation, authentication, and policy enforcement
 * *Advanced Cluster Security (ACS) 5* — VM scanning, file activity monitoring, Lightspeed risk enrichment, ACS MCP server integration, and init container scanning
@@ -100,7 +99,6 @@ CAUTION: This environment is managed by OpenShift GitOps (Argo CD). If you chang
 == Modules
 
 * xref:agentic-troubleshooting.adoc[Agentic Troubleshooting]
-* xref:agentic-updates.adoc[OpenShift Lightspeed Agentic Updates]
 * xref:mcp-server.adoc[MCP Server]
 * xref:mcp-gateway.adoc[MCP Gateway]
 * xref:acs.adoc[Advanced Cluster Security (ACS) 5]
