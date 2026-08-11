@@ -189,9 +189,9 @@ oc agentic run get $(oc agentic run list -o json | jq -r '.items[].metadata.name
 +
 The `oc agentic` CLI supports the full lifecycle of AgenticRuns: approve or deny proposed remediations (`oc agentic run approve` / `oc agentic run deny`), watch live agent logs (`oc agentic run logs`), or create a new run on demand (`oc agentic run create`). Run `oc agentic --help` to explore all available commands.
 
-. Once an AgenticRun moves to the *Proposed* phase, select it to drill into the step-by-step findings and remediation plan.
+. Once an AgenticRun moves to the *Proposed* phase, open the run corresponding to the `PaymentErrorRateHigh` alert to drill into the step-by-step findings and remediation plan.
 +
-image::agentic-troubleshooting-agentic-run-detail.png[AgenticRun detail with proposed remediation,link=_images/agentic-troubleshooting-agentic-run-detail.png,window=ea-images]
+image::agentic-troubleshooting-agentic-run-detail.png[AgenticRun detail for PaymentErrorRateHigh with proposed remediation,link=_images/agentic-troubleshooting-agentic-run-detail.png,window=ea-images]
 
 . Review the proposed remediation steps. Select the option that recommends rolling back to the last known good version — and click the *Execute remediation* button to authorize the change. It will ask you once again to confirm the execution. Click *Execute Remediation* once more to confirm.
 
