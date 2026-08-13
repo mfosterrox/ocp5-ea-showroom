@@ -12,7 +12,7 @@ Red Hat Advanced Cluster Security (ACS) 5 introduces several new capabilities fo
 
 . *OpenShift Lightspeed Integration for Risk Enrichment* — uses OpenShift Lightspeed to enrich ACS Risk findings with AI-assisted context: why a deployment ranks high, which signals drive the score, and what remediation to prioritize. Security teams can move from a ranked Risk list to an explained, actionable next step without leaving the console workflow.
 
-. *ACS MCP Server* — exposes ACS Vulnerability Management and Configuration Management APIs as MCP tools, allowing AI agents to interact programmatically with security data.
+. *ACS MCP Server* — exposes ACS Vulnerability Management APIs (CVEs, images, deployments, and nodes) and Configuration Management APIs (secured clusters) as MCP tools, allowing AI agents to query security data programmatically. The MCP server does not expose policy tools.
 
 . *Init Container Security Coverage* — RHACS now evaluates init containers for both image scanning and security policies. When a deployment references init containers, their images are scanned for vulnerabilities using the same process as main container images. Build and Deploy stage policies can be configured to include or exclude init containers using the "Filters" menu.
 
@@ -58,9 +58,6 @@ oc apply -R -f k8s-deployment-manifests/log4shell/
 oc apply -R -f k8s-deployment-manifests/webgoat/
 oc apply -R -f k8s-deployment-manifests/dvwa/
 oc apply -R -f k8s-deployment-manifests/emojivoto/
-oc apply -f - <<'EOF'
-include::example$init-container-demo.yaml[]
-EOF
 ----
 +
 Confirm the emojivoto workloads (used later for the FAM trigger) and the init-container demo are running:
@@ -522,8 +519,8 @@ In this exercise you will walk through the ACS (StackRox) MCP server: how it exp
 
 The ACS MCP server is based on https://github.com/stackrox/stackrox-mcp[stackrox-mcp^] (same approach as the RHACS demo `mcp-server-setup`). It exposes RHACS Central data to MCP-compatible clients through toolsets such as:
 
-* *Vulnerability management* — query CVEs, images, deployments, and related findings
-* *Configuration management* — read RHACS configuration such as clusters and policies (read-only in this lab)
+* *Vulnerability management* — query CVEs, images, deployments, and nodes (including `get_deployments_for_cve` and `get_nodes_for_cve`)
+* *Configuration management* — list secured clusters (read-only in this lab). There is no MCP tool for policies; review FAM and other policies in ACS Central as you did in Exercise 2.
 
 .How it fits together
 
@@ -596,10 +593,18 @@ Is CVE-2021-44228 (Log4Shell) detected in any of my clusters or deployments?
 +
 TIP: This lab deploys intentionally vulnerable demo apps (including log4shell). Compare the agent answer with *Vulnerability Management* in ACS Central.
 
-. Ask a configuration-oriented question:
+. Ask a multi-CVE question that should resolve deployments and namespaces for each CVE:
 +
 ----
-Using the ACS MCP tools, summarize the secured clusters and list a few runtime policies related to file activity or anomalous activity.
+Are any of the following CVEs present in my clusters: CVE-2025-47151, CVE-2024-47561? Show which deployments and namespaces are affected by each.
+----
++
+TIP: This prompt tests whether the agent can handle more than one CVE in a single request.
+
+. Ask whether cluster nodes are affected (this should invoke `get_nodes_for_cve`):
++
+----
+Are any of my cluster nodes affected by CVE-2021-44228?
 ----
 
 . Optionally try more targeted prompts:
@@ -609,10 +614,10 @@ Show deployments affected by critical CVEs in the juice-shop or log4shell namesp
 ----
 +
 ----
-Use the ACS MCP server and run list_clusters.
+Use the ACS MCP server and run list_secured_clusters.
 ----
 
-What you just proved:: The ACS MCP server translated natural-language questions into RHACS API tool calls (vulnerability and configuration), and Lightspeed returned security data without you running `roxctl` or clicking through every Central page manually.
+What you just proved:: The ACS MCP server translated natural-language questions into RHACS API tool calls (secured clusters, CVE lookups for deployments and nodes), and Lightspeed returned security data without you running `roxctl` or clicking through every Central page manually.
 
 ==== Connect an external MCP client (Optional)
 
@@ -665,7 +670,7 @@ claude mcp add --transport http acs \
 +
 Replace `<acs-mcp-route-host>` and `<paste-your-token-here>` with the values from the previous steps.
 
-. In your external client, run the same prompts as in the Lightspeed section (list clusters, Log4Shell CVE, file-activity policies) and confirm tools are invoked successfully.
+. In your external client, run the same prompts as in the Lightspeed section (list clusters, Log4Shell CVE, multi-CVE deployments, node CVE) and confirm tools are invoked successfully.
 
 ==== Structured feedback (ACS MCP Server)
 
@@ -675,75 +680,205 @@ link:https://docs.google.com/forms/d/e/1FAIpQLSdjrEjL3lCfmTTVEwwMct-H72UNZ729RsI
 
 === Exercise 5: Init Container Security Coverage
 
-In this exercise you use the init-container workload deployed in *Before You Begin*, confirm ACS sees the containers and scans the init image, create a Build/Deploy policy that can match or skip init containers, edit the policy Filters, then review the resulting violations in ACS.
+In this exercise you will walk through ACS 5 init container security coverage: image scanning and Build/Deploy policy evaluation for init containers, using four scoped demo deployments (Clean, Dirty, Blue, and Red).
 
-The workload is `nginx-with-waitfor` in namespace `acs-init-demo`: init container `wait-for-api` (`ghcr.io/kitstream/initium:latest`) plus an unprivileged `nginx` main container.
+==== Understanding init container security coverage
 
-==== 1. Sanity test: inspect containers in ACS
+Init containers run to completion before the main containers in a Pod start. They handle setup work such as waiting for a dependency, seeding files, or tuning the node. Because they execute with the same cluster credentials and image pull path as the rest of the Pod, they are an attack vector: a vulnerable or over-privileged init image can compromise the workload before the application container ever starts.
 
-. Confirm the pre-deployed init-container example is running:
+Init containers are not long-lived. After they finish, Kubernetes removes them, so the ACS 5 coverage that matters here is *image scanning* and *Build/Deploy policy evaluation*, not a long-running runtime process baseline.
+
+For background on how RHACS first started extracting and displaying init containers, see the link:https://docs.redhat.com/en/documentation/red_hat_advanced_cluster_security_for_kubernetes/4.11/html/release_notes/release-notes-411[RHACS 4.11 init container vulnerability scanning release note^]. That Technology Preview scanned and displayed init containers but did *not* evaluate policies against them. ACS 5 extends the same scan path so Build and Deploy stage policies can include or exclude init containers (use the *Filters* menu on the policy).
+
+.How RHACS evaluates init containers
+
+Scanner V4::
+Indexes init container images with the same process used for main container images.
+
+Sensor / Central::
+Attributes scan results and policy matches to the init container on the deployment, not only to the main container.
+
+Build and Deploy policies::
+Can be scoped to include or exclude init containers. This lab deploys two namespace-scoped demo policies so Dirty, Blue, and Red produce distinct, readable results.
+
+.The four scenarios
+
+The workloads live in `acs-init-container-test` and come from link:https://github.com/redhat-ads-tech/ea5-components[redhat-ads-tech/ea5-components^]. Each main container is `registry.k8s.io/pause:3.9` (a keep-alive placeholder). The findings you care about belong to the *init* container.
+
+[cols="1,3,1,1,1"]
+|===
+| Scenario | Init image and behavior | Privileged | CVE policy | Privileged policy
+
+| *Clean*
+| `gcr.io/distroless/base-debian12:debug-nonroot`. Echoes a safe message and exits. Non-root, no privilege escalation, all capabilities dropped.
+| No
+| No
+| No
+
+| *Dirty*
+| `gcr.io/distroless/python3-debian12:debug-nonroot`. Same well-behaved security context, but the image carries fixable Important+ CVEs.
+| No
+| Yes
+| No
+
+| *Blue*
+| Same clean distroless image, but `privileged: true` so it can run `sysctl -w vm.max_map_count=262144` (the Elasticsearch / ECK init-container pattern). A real policy hit that is often treated as noise.
+| Yes
+| No
+| Yes
+
+| *Red*
+| `gcr.io/distroless/nodejs18-debian12:debug-nonroot` plus `privileged: true` with no operational reason. Both the CVE policy and the privileged policy should fire.
+| Yes
+| Yes
+| Yes
+|===
+
+.Prerequisites
+
+These conditions are already met in this lab:
+
+* Init container scanning is enabled on the secured cluster (see xref:cluster-details.adoc[Appendix B: Technical Cluster Details]).
+* You are logged in to ACS Central from *Before You Begin* (`admin` / `{common_password}`).
+* The `acs-init-demo` / `nginx-with-waitfor` workload from *Before You Begin* is a separate namespace and is not used in this exercise.
+
+==== Prepare the test namespace and policies
+
+.Procedure
+
+. Create the dedicated project and grant the default service account the `privileged` SCC (Blue and Red need it):
 +
 [source,sh,subs="attributes",role=execute]
 ----
-oc get deploy,pods -n acs-init-demo
-oc get deploy nginx-with-waitfor -n acs-init-demo -o jsonpath='{range .spec.template.spec.initContainers[*]}{.name}{" -> "}{.image}{"\n"}{end}{range .spec.template.spec.containers[*]}{.name}{" -> "}{.image}{"\n"}{end}'
+oc new-project acs-init-container-test
+oc adm policy add-scc-to-user privileged -z default -n acs-init-container-test
 ----
-+
-You should see init container `wait-for-api` and main container `nginx`. If the namespace is missing, re-apply from *Before You Begin*:
+
+. Clone the demo components and apply the two namespace-scoped SecurityPolicy resources. The CRs are created in the `acs` namespace and are scoped to `acs-init-container-test` only:
 +
 [source,sh,subs="attributes",role=execute]
 ----
-oc apply -f - <<'EOF'
-include::example$init-container-demo.yaml[]
-EOF
+if [ ! -d "${HOME}/ea5-components" ]; then
+  git clone https://github.com/redhat-ads-tech/ea5-components.git "${HOME}/ea5-components"
+fi
+cd "${HOME}/ea5-components"
+oc create -f fixable-important-cve.yaml
+oc create -f privileged-init-container.yaml
+----
++
+The remaining `oc create -f` commands in this exercise assume that directory. Each block starts with `cd` so you can re-run a step if the terminal has moved.
+
+. Review the two policy definitions in the repo (or in ACS Central under *Platform Configuration > Policy Management*).
++
+*EAP-Init-Test: Privileged Container (Blue/Red)* fires on any privileged container (main or init) in `acs-init-container-test`. Blue is the justified/noise case. Red is the unjustified/true-positive case.
++
+[source,text]
+----
+policyName: "EAP-Init-Test: Privileged Container (Blue/Red)"
+description: "Demo policy for the RHACS 5.0 EAP init-container test workflow. Fires on any privileged container - main or init - inside the acs-init-container-test namespace. Used to validate that Build/Deploy policy evaluation reaches init containers (Blue = legitimate/noise, Red = illegitimate/true-positive)."
+rationale: "Containers running as privileged represent greater post-exploitation risk by allowing an attacker to access all host devices, run a daemon in the container, etc."
+remediation: "Verify that privileged capabilities are actually required (e.g. sysctl tuning) and cannot be provided via a narrower capability grant."
+----
++
+*EAP-Init-Test: Fixable Important+ CVE (Dirty/Red)* fires when any container image (main or init) in that namespace has a fixable CVE with CVSS >= 7. Dirty and Red should match. Clean and Blue should not.
++
+[source,text]
+----
+policyName: "EAP-Init-Test: Fixable Important+ CVE (Dirty/Red)"
+description: "Demo policy for the RHACS 5.0 EAP init-container test workflow. Fires when any container image - main or init - in the acs-init-container-test namespace has a fixable CVE with CVSS >= 7. Used to validate that image vulnerability scanning/policy evaluation attributes findings to init containers (Dirty and Red should match; Clean and Blue should not)."
+rationale: "Fixable vulnerabilities above this severity threshold represent real, addressable risk and should not be shipped in any container, including init containers."
+remediation: "Rebuild the image against an updated base to pick up the available fix."
 ----
 
-. In ACS Central, open *Configuration Management > Deployments*.
-. Find `nginx-with-waitfor` in namespace `acs-init-demo`.
-. Open the deployment and confirm both containers appear: init `wait-for-api` and main `nginx`.
-. Apply the container-type filter *Container Type: INIT* (wording may vary slightly by build). Confirm `wait-for-api` remains listed and is typed as an init container.
+. Optionally open one of those policies in ACS Central (*Platform Configuration > Policy Management*) and check the *Filters* menu. ACS 5 Build and Deploy policies can include or exclude init containers from evaluation.
 
-==== 2. Image scanning in Vulnerability Management
-
-. In ACS Central, open *Vulnerability Management > Results* (Images or Deployments view).
-. Locate the init image `ghcr.io/kitstream/initium:latest` (or the digest ACS resolved for it).
-. Confirm the image has a scan result and that findings are attributable to the init container / that image — not only to the main `nginx` image.
-. Open *Risk*, select `nginx-with-waitfor`, and check whether image vulnerabilities for the init container appear in the risk indicators.
-
-==== 3. Policy behavior: create a Build/Deploy policy
-
-The init image uses the mutable tag `latest`. Create a Build and Deploy policy that matches that tag, with *Filters* left at the default so all container types (including init) are evaluated.
-
-. In ACS Central, open *Platform Configuration > Policy Management* → *Create policy*.
-. Configure the policy as follows:
+. In ACS Central, open the *Dashboard*. Set *Resources* to `local-cluster` and the namespace filter to `acs-init-container-test`.
 +
-* *Name*: `EA Init Container - Latest Tag`
-* *Lifecycle*: enable *Build* and *Deploy*
-* *Severity*: Medium or High
-* *Policy criteria*: *Image Tag* → `latest`
-* *Filters*: leave at the default (all container types, including init)
-* *Enforcement*: *Inform* / notify (do not block)
-
-. Save and enable the policy.
-
-==== 4. Edit Filters to match or skip init containers
-
-. Edit `EA Init Container - Latest Tag`.
-. Set *Filters* to *skip init containers* (exact label may read "Exclude init containers" or similar).
-. Save the policy and allow about a minute for re-evaluation.
-. Confirm the init-container `:latest` match for `wait-for-api` stops firing while the policy remains enabled.
-. Edit the policy again and set *Filters* back to the default so init containers are included.
-. Save and allow about a minute for re-evaluation so init-container matches return.
-
-==== 5. Review violations in ACS
-
-. Open *Violations* in ACS Central.
-. Filter or search for policy `EA Init Container - Latest Tag` and deployment `nginx-with-waitfor`.
-. Confirm a violation is present that references the init image tag `latest` and, where shown, init container `wait-for-api`.
-. Open the violation details and note whether attribution to the init container (name/image) is clear enough to act on.
-. Compare with *Configuration Management* and *Vulnerability Management* for the same deployment: the containers, scan findings, and policy violation should tell one coherent story for this init-container workload.
+image::acs-clusters.png[ACS Dashboard resource filter set to local-cluster,link=_images/acs-clusters.png,window=ea-images]
 +
-NOTE: If the violation attributes only to the deployment without naming the init container, capture that in the feedback form — attribution UX is part of what this EA exercise validates.
+There should be no violations yet. You have policies, but no workloads.
+
+==== Run the Clean, Dirty, Blue, and Red scenarios
+
+NOTE: The ACS Dashboard is timestamped and does not auto-refresh. Reload the page after each deployment before you judge the result.
+
+. Deploy the Clean scenario:
++
+[source,sh,subs="attributes",role=execute]
+----
+cd "${HOME}/ea5-components"
+oc create -f clean-deployment.yaml
+----
++
+This creates `clean-app` with a `clean-init` init container that performs no dangerous actions.
+
+. In the OpenShift console, go to *Workloads > Deployments*, open `clean-app` in `acs-init-container-test`, and select the *YAML* tab.
++
+Confirm the `clean-init` definition (distroless base image, non-root, capabilities dropped). ACS has detected and scanned this init container and should not raise the two demo policies.
++
+image::acs-deployment-clean.png[Clean deployment YAML showing the clean-init container,link=_images/acs-deployment-clean.png,window=ea-images]
++
+Return to the ACS Dashboard (still filtered to `local-cluster` / `acs-init-container-test`). You should see at most a low-severity finding. *Active images at most risk* lists two images. One of them is the init image, `distroless/base-debian12`.
+
+. Deploy the Dirty scenario:
++
+[source,sh,subs="attributes",role=execute]
+----
+cd "${HOME}/ea5-components"
+oc create -f dirty-deployment.yaml
+----
+
+. In the OpenShift console, go to *Workloads > Topology*, select the `dirty-app` workload, then open the running Pod. On the *Logs* tab, use the container pulldown and select `dirty-init`.
++
+NOTE: A Pod can have more than one container. The pulldown includes init containers, so you can read `dirty-init` even after it has completed.
++
+The log shows a well-behaved init container. The risk is the *image*, not the command it ran.
+
+. Reload the ACS Dashboard with the same cluster and namespace filters.
++
+ACS has scanned the Dirty init container during deploy and should now show *High* violations. Click the *High* panel and confirm the findings are attributed to the init container, not only the pause main container.
++
+image::acs-deployment-dirty.png[ACS violation details for the Dirty init container,link=_images/acs-deployment-dirty.png,window=ea-images]
++
+NOTE: RHACS detected and reported image violations on the init container of the Dirty deployment.
+
+. Deploy the Blue scenario:
++
+[source,sh,subs="attributes",role=execute]
+----
+cd "${HOME}/ea5-components"
+oc create -f blue-deployment.yaml
+----
++
+This init container switches to privileged and performs a legitimate action (`sysctl` for `vm.max_map_count`).
+
+. In *Workloads > Topology*, confirm `blue-app` is running (blue border on the workload). Open the Pod *Logs* tab and select `blue-init`.
++
+Reload the ACS Dashboard. You should see additional policy violations for the privileged init container, and a change in *Risk Priority* under *Active images at most risk*.
++
+NOTE: Blue is a real privileged-policy hit with an operational justification. Treat it as the noise case when you compare it to Red.
+
+. Deploy the Red scenario:
++
+[source,sh,subs="attributes",role=execute]
+----
+cd "${HOME}/ea5-components"
+oc create -f red-deployment.yaml
+----
+
+. In *Workloads > Topology*, open `red-app`, then the running Pod, then *Logs* for `red-init`. The log should read:
++
+----
+red-init: unpatched image with known CVEs, running privileged with no legitimate justification
+----
+
+. Reload the ACS Dashboard (`local-cluster`, namespace `acs-init-container-test`). You should now see critical CVE and privileged violations for the Red init container:
++
+image::acs-deployment-red.png[ACS Dashboard showing critical CVE and privileged violations for the Red init container,link=_images/acs-deployment-red.png,window=ea-images]
++
+NOTE: The distroless images in this namespace are the init-container images. These four deployments show that the ACS policy engine evaluates init containers as well as the main container on the deployment.
+
+What you just proved:: ACS 5 scanned the init container images, attributed findings to those init containers, and fired namespace-scoped Build/Deploy policies on Dirty (CVEs), Blue (justified privileged), and Red (CVEs plus unjustified privileged). Clean stayed quiet on both demo policies.
 
 ==== Structured feedback (Init Container Security Coverage)
 
@@ -751,15 +886,11 @@ Thank you for completing this exercise! Please help us improve by submitting fee
 
 link:https://docs.google.com/forms/d/e/1FAIpQLSdjrEjL3lCfmTTVEwwMct-H72UNZ729RsIkUQ8Wvp5yHmtrOw/formResponse[ACS 5.0 Feedback Form — Init Container Security Coverage^]
 
-== Other Things to Try
-
-* TBD
-
 == Key Takeaways
 
 * ACS 5 extends security coverage beyond containers to virtual machines running on OpenShift Virtualization
 * roxagent listens over VSOCK for Sensor pull requests, requiring no guest network configuration for ACS scanning
 * File activity monitoring provides visibility into security-relevant file access patterns
 * Lightspeed Risk Enrichment (when available) explains and prioritizes ACS Risk findings with AI-assisted context
-* The ACS MCP server enables AI agents to query and act on security data programmatically
+* The ACS MCP server enables AI agents to query secured clusters and CVE findings (deployments and nodes) programmatically
 * Init container scanning extends image and policy coverage to init containers
