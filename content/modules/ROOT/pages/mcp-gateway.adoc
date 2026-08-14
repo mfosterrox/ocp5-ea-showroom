@@ -218,6 +218,8 @@ for user in user1 user2; do
   done
 done
 ----
++
+This shows that `user1` belongs to `team-a` and can call all inventory and accounts tools (10 tools), while `user2` belongs to `team-b` and can only call payments tools (5 tools). These mappings are enforced by the gateway's AuthPolicy using CEL expressions that inspect the JWT `resource_access` claim.
 
 . First, verify that user1 can call an inventory tool:
 +
