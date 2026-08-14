@@ -434,7 +434,7 @@ When a backend MCP server becomes unavailable, the gateway gracefully removes it
 fastmcp list $SERVER --auth $USER1_TOKEN
 ----
 +
-You should see 17 tools.
+The first line of output shows `Tools (17)` — confirming all three backend servers are available.
 
 . Scale down the inventory server:
 +
