@@ -22,18 +22,24 @@ Each of these features is covered in more detail in the following sections. Part
 
 == Before You Begin
 
-* Register for the link:https://docs.google.com/forms/d/e/1FAIpQLSdjrEjL3lCfmTTVEwwMct-H72UNZ729RsIkUQ8Wvp5yHmtrOw/viewform[ACS 5.0 Feedback Form^].
+* Register for the link:https://docs.google.com/forms/d/e/1FAIpQLSdjrEjL3lCfmTTVEwwMct-H72UNZ729RsIkUQ8Wvp5yHmtrOw/viewform[ACS 5.0 Feedback Form^]. You can track your feedback in the doc and there is a link to the form at the end of each exercise.
 
-NOTE: After you enter your basic information, you can track progress and leave feedback for each feature. A link to the matching form section appears at the end of every exercise.
-
-* Next, confirm you can open the OpenShift console and ACS Central tabs in the Showroom UI
-
-* Log in to ACS Central (admin / `{common_password}`):
+* Next, confirm you can open the OpenShift console and ACS Central tabs in the Showroom UI. Log in with these credentials:
 +
-[source,text,role="copypaste",subs="+attributes"]
-----
-https://central-acs.{openshift_cluster_ingress_domain}
-----
+[cols="1,1,1,1"]
+|===
+| *Service* | *Username* | *Password* | *Link*
+
+| OpenShift Console
+| `{openshift_cluster_admin_username}`
+| `{openshift_cluster_admin_password}`
+| {openshift_cluster_console_url}[Console^]
+
+| ACS Central
+| `admin`
+| `{common_password}`
+| https://central-acs.{openshift_cluster_ingress_domain}[ACS Central^]
+|===
 
 * Verify the Secured Cluster is connected: navigate to *Platform Configuration > Clusters* in ACS Central and confirm the Secured Cluster is listed.
 
@@ -50,24 +56,26 @@ You should see `rhel9-vm` in a `Running` phase.
 +
 [source,sh,subs="attributes",role=execute]
 ----
-git clone https://github.com/mfosterrox/demo-applications.git
-cd demo-applications
+cd ~/ && git clone https://github.com/mfosterrox/demo-applications.git
+cd ~/demo-applications
 oc apply -f k8s-deployment-manifests/-namespaces/
 oc apply -R -f k8s-deployment-manifests/juice-shop/
 oc apply -R -f k8s-deployment-manifests/log4shell/
 oc apply -R -f k8s-deployment-manifests/webgoat/
 oc apply -R -f k8s-deployment-manifests/dvwa/
-oc apply -R -f k8s-deployment-manifests/emojivoto/
+oc apply -R -f k8s-deployment-manifests/acs-fam-demo/
 ----
 +
-Confirm the emojivoto workloads (used later for the FAM trigger) and the init-container demo are running:
+Confirm the FAM trigger and a sample vulnerable app are running:
 +
 [source,sh,subs="attributes",role=execute]
 ----
-oc get deploy,pods -n emojivoto
-oc rollout status deploy/nginx-with-waitfor -n acs-init-demo --timeout=180s
-oc get deploy,pods -n acs-init-demo
+oc rollout status deploy/fam-target -n acs-fam-demo --timeout=120s
+oc get deploy,pods -n acs-fam-demo
+oc get deploy,pods -n juice-shop
 ----
++
+You should see `fam-target` in `Running` phase. The init-container demo is deployed later in Exercise 5 (`acs-init-container-test`), not in this step.
 
 * Verify the ACS MCP server is available:
 +
@@ -408,39 +416,29 @@ Confirm:
 +
 TIP: The GitOps source for these policies is in the lab GitOps repository under `acs/acs-instance/templates/fim-deployment-policy.yaml` and `fim-node-policy.yaml`.
 
-. Confirm the emojivoto demo workload used for the FAM trigger is running:
+. Confirm the FAM trigger workload from *Before You Begin* is running:
 +
 [source,sh,subs="attributes",role=execute]
 ----
-oc get deploy -n emojivoto
-oc get pods -n emojivoto -o wide
+oc get deploy,pods -n acs-fam-demo
 ----
 +
-You should see `web`, `emoji`, `voting`, and `vote-bot` deployments with pods in `Running` phase. If they are missing, re-apply from *Before You Begin*:
-+
-[source,sh,subs="attributes",role=execute]
-----
-if [ ! -d demo-applications ]; then
-  git clone https://github.com/mfosterrox/demo-applications.git
-fi
-cd demo-applications
-oc apply -R -f k8s-deployment-manifests/emojivoto/
-----
+You should see `fam-target` with a pod in `Running` phase.
 
 ==== Trigger and review a deployment FAM violation
 
-. Trigger a monitored file operation inside an emojivoto pod.
+. Trigger a monitored file operation inside the FAM target pod.
 +
-OpenShift often runs these containers under a restricted SCC (non-root), so use `oc debug --as-root` against the `web` deployment. That still records as a *deployment* file-activity event for FAM:
+OpenShift often runs these containers under a restricted SCC (non-root), so use `oc debug --as-root` against the `fam-target` deployment. That still records as a *deployment* file-activity event for FAM:
 +
 [source,sh,subs="attributes",role=execute]
 ----
-oc debug -n emojivoto deploy/web --as-root -- touch /etc/passwd
+oc debug -n acs-fam-demo deploy/fam-target --as-root -- touch /etc/passwd
 ----
 +
 This matches the *Deployment File Activity* policy (`/etc/{asterisk}{asterisk}/{asterisk}` under a deployment event source).
 +
-TIP: If `oc debug --as-root` is unavailable in your client, try `oc exec -n emojivoto deploy/web -c web-svc -- touch /etc/passwd`. That succeeds only when the container can write under `/etc`.
+TIP: If `oc debug --as-root` is unavailable in your client, try `oc exec -n acs-fam-demo deploy/fam-target -- touch /etc/passwd`. That succeeds only when the container can write under `/etc`.
 
 . In ACS Central, open *Violations*.
 +
@@ -740,7 +738,6 @@ These conditions are already met in this lab:
 
 * Init container scanning is enabled on the secured cluster (see xref:cluster-details.adoc[Appendix B: Technical Cluster Details]).
 * You are logged in to ACS Central from *Before You Begin* (`admin` / `{common_password}`).
-* The `acs-init-demo` / `nginx-with-waitfor` workload from *Before You Begin* is a separate namespace and is not used in this exercise.
 
 ==== Prepare the test namespace and policies
 

@@ -92,7 +92,7 @@ or troubleshooting.
 
 This environment uses three distinct application sets:
 
-* *ACS / Roadshow apps* — participant-deployed from https://github.com/mfosterrox/demo-applications[demo-applications^] during the ACS exercise (juice-shop, log4shell, webgoat, dvwa, emojivoto). FAM uses the `emojivoto` namespace for the deployment file-activity trigger.
+* *ACS / Roadshow apps* — participant-deployed from https://github.com/mfosterrox/demo-applications[demo-applications^] during the ACS exercise (juice-shop, log4shell, webgoat, dvwa, acs-fam-demo). FAM uses the UBI `fam-target` deployment in the `acs-fam-demo` namespace.
 * *Agentic Troubleshooting apps* — preinstalled broken workloads for Lightspeed investigations in the existing `payments` namespace (see below)
 * *MCP demo / mock servers* — preinstalled `mcp-demo-*` namespaces and `mock-mcp-servers` for MCP Server / MCP Gateway exercises
 

@@ -69,7 +69,7 @@ echo ""
 echo "--- Resetting ACS exercise state ---"
 
 # Before You Begin: Delete demo app namespaces
-for ns in juice-shop log4shell webgoat dvwa emojivoto; do
+for ns in juice-shop log4shell webgoat dvwa emojivoto acs-fam-demo; do
   oc delete ns "$ns" --ignore-not-found 2>/dev/null || true
 done
 echo "  Deleted demo app namespaces"
