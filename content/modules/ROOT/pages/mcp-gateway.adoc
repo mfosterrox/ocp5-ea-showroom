@@ -192,7 +192,32 @@ Access to individual tools is controlled by Keycloak groups and client roles. Ea
 * *user1* (team-a) — can access inventory + accounts tools (10 tools)
 * *user2* (team-b) — can access payments tools only (5 tools)
 
-//-
+. Query the live Keycloak configuration to see the group-to-tool mappings. This accesses the Keycloak admin API to show each user's group membership and the tools they are authorized to call — this is fully configurable through the Keycloak admin console:
++
+[source,sh,role=execute]
+----
+ADMIN_USER=$(oc get secret keycloak-initial-admin -n keycloak -o jsonpath='{.data.username}' | base64 -d)
+ADMIN_PASS=$(oc get secret keycloak-initial-admin -n keycloak -o jsonpath='{.data.password}' | base64 -d)
+TOKEN=$(curl -sk "${SSO_URL}/realms/master/protocol/openid-connect/token" \
+  -d "grant_type=password&client_id=admin-cli&username=${ADMIN_USER}&password=${ADMIN_PASS}" \
+  | jq -r '.access_token')
+
+kc() { curl -sk -H "Authorization: Bearer ${TOKEN}" "${SSO_URL}/admin/realms/keycloak/$1"; }
+
+G='\033[0;32m' C='\033[0;36m' Y='\033[1;33m' W='\033[1;37m' R='\033[0m'
+printf "${W}%-10s %-8s %s${R}\n" "User" "Group" "Accessible Tools"
+printf "${W}%-10s %-8s %s${R}\n" "-------" "------" "----------------"
+for user in user1 user2; do
+  USER_ID=$(kc "users?username=${user}&exact=true" | jq -r '.[0].id')
+  kc "users/${USER_ID}/groups" | jq -r '.[].name' | while read group; do
+    GROUP_ID=$(kc "groups?search=${group}" | jq -r '.[0].id')
+    TOOLS=$(kc "clients" | jq -r '.[] | select(.clientId | contains("mock-mcp")) | .id' | while read cid; do
+      kc "groups/${GROUP_ID}/role-mappings/clients/${cid}" | jq -r '.[].name' 2>/dev/null
+    done | sed 's/tool://' | sort | paste -sd, -)
+    printf "${G}%-10s ${Y}%-8s ${C}%s${R}\n" "$user" "$group" "$TOOLS"
+  done
+done
+----
 
 . First, verify that user1 can call an inventory tool:
 +
