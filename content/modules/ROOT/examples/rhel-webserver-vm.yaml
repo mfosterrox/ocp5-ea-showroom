@@ -19,7 +19,7 @@ spec:
           sockets: 1
           threads: 1
         devices:
-          autoattachVSOCK: true # <1>
+          autoattachVSOCK: true
           disks:
             - bootOrder: 1
               disk:
@@ -41,32 +41,20 @@ spec:
           bootloader:
             efi: {}
         machine:
-          type: pc-q35-rhel9.6.0   # Matches RHEL 9/10 compat
+          type: pc-q35-rhel9.6.0
         memory:
           guest: 2Gi
+      nodeSelector:
+        node-role.kubernetes.io/worker: ""
       networks:
         - name: default
           pod: {}
       terminationGracePeriodSeconds: 180
       volumes:
-        - dataVolume:
-            name: rhel-webserver   # Will create/manage the PVC
-          name: rootdisk
+        - name: rootdisk
+          containerDisk:
+            image: quay.io/rhpds/ocp5-vm-primed:rhel9
         - name: cloudinitdisk
           cloudInitNoCloud:
             secretRef:
-              name: rhel-webserver-cloudinit # <2>
-  dataVolumeTemplates:
-    - apiVersion: cdi.kubevirt.io/v1beta1
-      kind: DataVolume
-      metadata:
-        name: rhel-webserver
-      spec:
-        sourceRef:
-          kind: DataSource
-          name: rhel9 # <3>
-          namespace: openshift-virtualization-os-images
-        storage:
-          resources:
-            requests:
-              storage: 30Gi
+              name: rhel-webserver-cloudinit
