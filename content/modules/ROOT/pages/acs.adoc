@@ -204,18 +204,15 @@ Password:
 +
 Run the remaining guest commands in this procedure from the VM console, not from the Showroom terminal.
 
-. Verify that `roxagent` is installed and healthy inside the VM. Run these from the VM console (`sudo` is required for VSOCK and logs):
+. Verify that `roxagent` is installed and healthy inside the VM. Run these from the VM console:
 +
-[source,sh,subs="attributes",role="copypaste"]
+[source,sh,role="copypaste"]
 ----
 command -v roxagent
-pgrep -a roxagent
-sudo ss -A vsock
-sudo tail -n 40 /var/log/roxagent.log 2>/dev/null
-sudo journalctl -u roxagent.service --no-pager -n 20 2>/dev/null
+sudo journalctl -u roxagent.service --no-pager -n 20
 ----
 +
-NOTE: Current `roxagent` runs `serve --port 818` (VSOCK pull). You should see the process, a VSOCK listen on port `818`, and a log line like `Initial scan complete, report cached. Num packages:`. Use the log file if cloud-init started the agent with `nohup`; use `journalctl` if this guest uses a systemd unit. Empty systemd logs alone do not mean the agent failed.
+`command -v` should print the `roxagent` path. The journal should show the `roxagent` unit running `serve --port 818` (VSOCK pull) and a completed scan, for example `Initial scan complete, report cached. Num packages:`.
 
 . In ACS Central, open *Vulnerability Management > Results > Virtual Machines*.
 +
@@ -229,7 +226,9 @@ Use the *Vulnerabilities*, *Components*, and *Details* tabs to explore findings 
 +
 image::acs-vm-rhel9-cve-details.png[ACS vulnerability details for rhel9-vm showing CVE severity summary and CVE table,link=_images/acs-vm-rhel9-cve-details.png,window=ea-images]
 
-Do you like what you see? What would you like to see improved? What workflows would you like to see supported?
+* Do you like what you see? 
+* What would you like to see improved? 
+* What workflows would you like to see supported?
 
 [.step-title]
 Create and onboard a second VM (Optional)
@@ -265,7 +264,7 @@ EOF
 * References the cloud-init Secret from the previous step
 * Boots the same primed RHEL 9 containerDisk as `rhel9-vm` (`quay.io/rhpds/ocp5-vm-primed:rhel9`) so the guest starts without cloning a 30Gi DataSource
 +
-[source,yaml,role="copypaste"]
+[source,yaml,role=execute]
 ----
 oc apply -f - <<'EOF'
 include::example$rhel-webserver-vm.yaml[]
